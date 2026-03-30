@@ -55,6 +55,8 @@ program nour
   ! ----------------------------------------------------
   drutes_config%dimen = 2
   call init_flow_topology()
+  call print_graph_diagnostics()
+  
 
   print *, "-----------------------------------------------"
   print *, " Downstream Graph"

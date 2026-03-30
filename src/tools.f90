@@ -14,13 +14,14 @@ contains
     do i = 1, ubound(r,1)
       avgval = avgval + r(i)
     end do
-    avgval = avgval / real(ubound(r,1), kind=rkind)
+
   end function avg
 
 
   subroutine read_mesh(filename)
+    
     character(len=*), intent(in) :: filename
-    integer :: unit, ios, n_nodes, n_elem
+    integer :: fileid, ios, n_nodes, n_elem
     integer :: id, n1, n2, n3, i
     real(kind=rkind) :: x, y, zloc
     character(len=256) :: line
@@ -32,11 +33,11 @@ contains
        stop
     end if
 
-    open(newunit=unit, file=filename, status="old", action="read", iostat=ios)
+    open(newunit=fileid, file=filename, status="old", action="read", iostat=ios)
     if (ios /= 0) stop " Could not open mesh file."
 
     do
-       read(unit,'(A)',iostat=ios) line
+       read(fileid,*,iostat=ios) line
        if (ios < 0) stop "Unexpected EOF before node count"
        if (len_trim(line) > 0 .and. line(1:1) /= "#") exit
     end do
@@ -48,7 +49,7 @@ contains
 
     i = 0
     do while (i < n_nodes)
-       read(unit,'(A)',iostat=ios) line
+       read(fileid,'(A)',iostat=ios) line
        if (ios < 0) exit
        if (len_trim(line) == 0 .or. line(1:1) == "#") cycle
        read(line,*) id, x, y, zloc
@@ -60,7 +61,7 @@ contains
     print *, " Read", i, "nodes."
 
     do
-       read(unit,'(A)',iostat=ios) line
+       read(fileid,'(A)',iostat=ios) line
        if (ios < 0) stop "Unexpected EOF before element count"
        if (len_trim(line) > 0 .and. line(1:1) /= "#") exit
     end do
@@ -78,7 +79,7 @@ contains
 
     i = 0
     do while (i < n_elem)
-       read(unit,'(A)',iostat=ios) line
+       read(fileid,'(A)',iostat=ios) line
        if (ios < 0) exit
        if (len_trim(line) == 0 .or. line(1:1) == "#") cycle
        read(line,*) id, n1, n2, n3
@@ -87,11 +88,12 @@ contains
        elements%material(i) = 1_ikind
     end do
     print *, " Read", i, "triangular elements."
-    close(unit)
+    close(fileid)
 
     if (.not. allocated(elements%hydrobal)) then
        allocate(elements%hydrobal(n_elem))
     end if
+    
   end subroutine read_mesh
 
 
@@ -114,7 +116,7 @@ contains
        total_area       = total_area + elements%area(i)
     end do
 
-    print "(A,F12.3)", " Total mesh area = ", total_area
+    print *, " Total mesh area = ", total_area
   end subroutine compute_areas
 
 
@@ -281,7 +283,7 @@ contains
   end function dist
 
 
-    subroutine build_graph()
+  subroutine build_graph()
     integer(kind=ikind) :: el, i
     integer(kind=ikind), dimension(3) :: ngh
     real(kind=rkind),    dimension(3) :: nghalt

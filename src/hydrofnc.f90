@@ -4,7 +4,7 @@ module hydrofnc
   use globals
   implicit none
 
-  real(kind=rkind), parameter :: PI_RKIND = 3.14159265358979323846_rkind
+  real(kind=rkind), parameter :: PI_RKIND = 4*atan(1.0_rkind)
 
 contains
 
@@ -122,7 +122,7 @@ contains
 
   ! ---- Main driver: compute all steps with routing ----
   subroutine compute_all()
-    use tools, only: route_step
+    use tools
     integer(kind=ikind) :: el
 
     do time_step = 1, n_days

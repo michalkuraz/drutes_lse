@@ -4,8 +4,14 @@ module globals
   implicit none
 
   ! Time/progress helpers
-  real(kind=rkind) :: tmp, tmp1, sim_time, start_time, end_time, time
+  real(kind=rkind) :: tmp, tmp1, sim_time, start_time, end_time, time, time_step
   logical          :: www
+  
+  
+  
+
+    
+    
 
   ! ---------- Node structure ----------
   type :: nodes_str
@@ -30,6 +36,7 @@ module globals
      real(kind=rkind) :: ET      = 0.0_rkind
      real(kind=rkind) :: Qgw     = 0.0_rkind
      real(kind=rkind) :: Qsurf   = 0.0_rkind
+     real(kind=rkind) :: storage = 0.0_rkind
   end type hydrobal_str
 
   ! ---------- Element structure ----------
@@ -50,11 +57,29 @@ module globals
 
   type(nodes_str)    :: nodes
   type(elements_str) :: elements
+  
+  
+  
+  real(kind=rkind), dimension(:), allocatable :: meteotime
+  
+  
+  type, public :: hydrodata_str
+    !> meteorological data
+    real(kind=rkind), dimension(:), allocatable :: precip, G, Tmax, Tmin, Tmean, uz, soilwcontent, RHmax, RHmin
+    !> land cover data
+    real(kind=rkind) :: conduct
+  end type hydrodata_str
+  
+  type(hydrodata_str), dimension(:), allocatable :: hydrodata
+  
+  
 
   ! Simulation time discretisation
   integer(kind=ikind), parameter :: n_days = 1
-  integer(kind=ikind) :: CN, Julian_day , time_step
+  integer(kind=ikind) :: CN, Julian_day 
   real(kind=rkind) :: phi, as, bs, z, alpha, sigma, gsc, ccrop
+
+  ! Element-based hydro inputs & outputs (time series)
 
   ! Element-based hydro inputs & outputs (time series)
   real(kind=rkind), allocatable :: precip(:,:), qinter(:,:), qout(:,:)

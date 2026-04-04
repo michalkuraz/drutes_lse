@@ -12,7 +12,7 @@ contains
 
     avgval = 0.0_rkind
     do i = 1, ubound(r,1)
-      avgval = avgval + r(i)
+      avgval = avgval / real(size(r), kind=rkind)
     end do
 
   end function avg
@@ -514,45 +514,51 @@ subroutine init_flow_topology()
 !  Print element balance
 !==============================================================
 subroutine init_flow_topology()
-  subroutine print_element_balance()
-    integer(kind=ikind) :: i
-    real(kind=rkind)    :: surplus
+  subroutine print_element_balance(n_days)
+  integer(kind=ikind), intent(in) :: n_days
+  integer(kind=ikind) :: i
+  real(kind=rkind)    :: surplus
 
-    if (.not. allocated(elements%hydrobal)) then
-       print *, " No hydrological data to display."
-       return
-    end if
+  if (.not. allocated(elements%hydrobal)) then
+     print *, "No hydrological data to display."
+     return
+  end if
 
-    print *, "--------------------------------------------------------------------------------------------------------------"
-    print *, " Element |     P        ET      Qsurf       Li       Qgw      Qin     Surplus   Qout_elem  Overflow    deltaS"
-    print *, "--------------------------------------------------------------------------------------------------------------"
+  print *, "----------------------------------------------------------------------------------------------------------------"
+  print *, " Element |     P        ET      Qsurf       Li       Qgw      Qin     Surplus   Qout_elem  Overflow    deltaS"
+  print *, "----------------------------------------------------------------------------------------------------------------"
 
-    do i = 1_ikind, elements%kolik
-       surplus = elements%hydrobal(i)%Qsurf + &
-                 elements%hydrobal(i)%Li    + &
-                 elements%hydrobal(i)%Qgw
+  do i = 1_ikind, elements%kolik
+     surplus = elements%hydrobal(i)%Qsurf + &
+               elements%hydrobal(i)%Li    + &
+               elements%hydrobal(i)%Qgw
 
-       write(*,'(I7,9F12.6)') i, precip(i,1), elements%hydrobal(i)%ET, &
-            elements%hydrobal(i)%Qsurf, elements%hydrobal(i)%Li, &
-            elements%hydrobal(i)%Qgw, elements%hydrobal(i)%inflow, &
-            surplus, elements%hydrobal(i)%outflow, &
-            elements%hydrobal(i)%deltas
-    end do
-  end subroutine print_element_balance
+     write(*,'(I7,10F12.6)') i, precip(i,n_days), elements%hydrobal(i)%ET, &
+          elements%hydrobal(i)%Qsurf, elements%hydrobal(i)%Li, &
+          elements%hydrobal(i)%Qgw, elements%hydrobal(i)%inflow, &
+          surplus, elements%hydrobal(i)%outflow, &
+          elements%overflow(i), &
+          elements%hydrobal(i)%deltas
+  end do
+end subroutine print_element_balance
 
 
-  subroutine export_element_balance(filename)
-    character(len=*), intent(in) :: filename
-    integer(kind=ikind) :: i
-    integer :: unit
-    real(kind=rkind) :: surplus, qout_catch
+!==============================================================
+!   EXPORT ELEMENT WATER BALANCE TO CSV
+!==============================================================
+subroutine export_element_balance(filename, n_days)
+  character(len=*), intent(in) :: filename
+  integer(kind=ikind), intent(in) :: n_days
+  integer(kind=ikind) :: i
+  integer :: unit, ios
+  real(kind=rkind) :: surplus, qout_catch
 
-    if (.not. allocated(elements%hydrobal)) then
-       print *, " No hydrological data to export."
-       return
-    end if
+  if (.not. allocated(elements%hydrobal)) then
+     print *, "No hydrological data to export."
+     return
+  end if
 
-    open(newunit=unit, file=filename, status="replace", action="write", iostat=ios)
+  open(newunit=unit, file=filename, status="replace", action="write", iostat=ios)
   if (ios /= 0) then
      print *, "Error opening file: ", trim(filename)
      return
@@ -562,39 +568,39 @@ subroutine init_flow_topology()
                     "P,ET,Qsurf,Li,Qgw,Qin,Surplus," // &
                     "Qout_elem,Qout_catchment,Overflow,DeltaS,Qsurf_local"
 
-    do i = 1_ikind, elements%kolik
-       surplus = elements%hydrobal(i)%Qsurf + &
-                 elements%hydrobal(i)%Li    + &
-                 elements%hydrobal(i)%Qgw
+  do i = 1_ikind, elements%kolik
+     surplus = elements%hydrobal(i)%Qsurf + &
+               elements%hydrobal(i)%Li    + &
+               elements%hydrobal(i)%Qgw
 
-       if (downstream(i) == 0_ikind) then
-          qout_catch = elements%hydrobal(i)%outflow
-       else
-          qout_catch = 0.0_rkind
-       end if
+     if (downstream(i) == 0_ikind) then
+        qout_catch = elements%hydrobal(i)%outflow
+     else
+        qout_catch = 0.0_rkind
+     end if
 
-       write(unit,'(I4, ",", F10.3, ",", F10.3, ",", I4, 12(",",F10.3))') &
-            i,                              &
-            elements%area(i),               &
-            elements%avgalt(i),             &
-            downstream(i),                  &
-            precip(i,1),                    &
-            elements%hydrobal(i)%ET,        &
-            elements%hydrobal(i)%Qsurf,     &
-            elements%hydrobal(i)%Li,        &
-            elements%hydrobal(i)%Qgw,       &
-            elements%hydrobal(i)%inflow,    &
-            surplus,                        &
-            elements%hydrobal(i)%outflow,   &
-            qout_catch,                     &
-            elements%overflow(i),           &
-            elements%hydrobal(i)%deltas,    &
-            Qsurf_result(i,1)
-    end do
+     write(unit,'(I4, ",", F10.3, ",", F10.3, ",", I4, 12(",",F10.3))') &
+          i,                              &
+          elements%area(i),               &
+          elements%avgalt(i),             &
+          downstream(i),                  &
+          precip(i,n_days),                &
+          elements%hydrobal(i)%ET,        &
+          elements%hydrobal(i)%Qsurf,     &
+          elements%hydrobal(i)%Li,        &
+          elements%hydrobal(i)%Qgw,       &
+          elements%hydrobal(i)%inflow,    &
+          surplus,                        &
+          elements%hydrobal(i)%outflow,   &
+          qout_catch,                     &
+          elements%overflow(i),           &
+          elements%hydrobal(i)%deltas,    &
+          Qsurf_result(i,n_days)
+  end do
 
-    close(unit)
-    print *, " Element balances saved to: ", trim(filename)
-  end subroutine export_element_balance
+  close(unit)
+  print *, "Element balances saved to: ", trim(filename)
+end subroutine export_element_balance
 
 !==============================================================
 !   Routing

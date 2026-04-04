@@ -75,16 +75,18 @@ module globals
   
 
   ! Simulation time discretisation
-  integer(kind=ikind), parameter :: n_days = 1
+  integer(kind=ikind), parameter :: ntot_days = 10
+  integer(kind=ikind), parameter :: dt_days = 10
+  integer(kind=ikind), parameter :: n_days = ntot_days / dt_days
   integer(kind=ikind) :: CN, Julian_day 
   real(kind=rkind) :: phi, as, bs, z, alpha, sigma, gsc, ccrop
 
   ! Element-based hydro inputs & outputs (time series)
 
   ! Element-based hydro inputs & outputs (time series)
-  real(kind=rkind), allocatable :: precip(:,:), qinter(:,:), qout(:,:)
-  real(kind=rkind), allocatable :: conduct(:,:), G(:,:), Tmax(:,:), Tmin(:,:), Tmean(:,:)
-  real(kind=rkind), allocatable :: RHmax(:,:), RHmin(:,:), uz(:,:), soilcontent(:,:)
+  !real(kind=rkind), allocatable :: precip(:,:), qinter(:,:), qout(:,:)
+  !real(kind=rkind), allocatable :: conduct(:,:), G(:,:), Tmax(:,:), Tmin(:,:), Tmean(:,:)
+  !real(kind=rkind), allocatable :: RHmax(:,:), RHmin(:,:), uz(:,:), soilcontent(:,:)
 
   real(kind=rkind), allocatable :: Qsurf_result(:,:), ET_flux(:,:), &
                                    L_result(:,:), Qgw_result(:,:), deltas(:,:)

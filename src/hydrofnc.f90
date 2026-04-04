@@ -125,20 +125,20 @@ contains
     use tools
     integer(kind=ikind) :: el
 
-    do time_step = 1, n_days
+    do dt_days = 1, ntot_days
 
        ! 1) Local fluxes per element
        do el = 1, elements%kolik
-          elements%hydrobal(el)%ET    = penman_monteith(el,time_step) * ccrop
-          elements%hydrobal(el)%Qsurf = surface_runoff(el,time_step)
-          elements%hydrobal(el)%Li    = leakage(el,time_step)
-          elements%hydrobal(el)%Qgw   = ground_water(el,time_step)
+          elements%hydrobal(el)%ET    = penman_monteith(el,dt_days) * ccrop
+          elements%hydrobal(el)%Qsurf = surface_runoff(el,dt_days)
+          elements%hydrobal(el)%Li    = leakage(el,dt_days)
+          elements%hydrobal(el)%Qgw   = ground_water(el,dt_days)
 
           ! keep legacy arrays
-          ET_flux(el,time_step)      = elements%hydrobal(el)%ET
-          Qsurf_result(el,time_step) = elements%hydrobal(el)%Qsurf
-          L_result(el,time_step)     = elements%hydrobal(el)%Li
-          Qgw_result(el,time_step)   = elements%hydrobal(el)%Qgw
+          ET_flux(el,dt_days)      = elements%hydrobal(el)%ET
+          Qsurf_result(el,dt_days) = elements%hydrobal(el)%Qsurf
+          L_result(el,dt_days)     = elements%hydrobal(el)%Li
+          Qgw_result(el,dt_days)   = elements%hydrobal(el)%Qgw
 
           elements%hydrobal(el)%inflow  = 0.0_rkind
           elements%hydrobal(el)%outflow = 0.0_rkind
@@ -146,7 +146,7 @@ contains
        end do
 
        ! 2) Routing + mass balance
-       call route_step(time_step)
+       call route_step(dt_days)
 
     end do
 

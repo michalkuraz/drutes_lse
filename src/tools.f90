@@ -17,7 +17,10 @@ contains
 
   end function avg
 
-
+!==============================================================
+!   READ MESH (nodes + elements)
+!==============================================================
+subroutine read_mesh(filename)
   subroutine read_mesh(filename)
     
     character(len=*), intent(in) :: filename
@@ -96,7 +99,10 @@ contains
     
   end subroutine read_mesh
 
-
+!==============================================================
+!   COMPUTE ELEMENT AREAS
+!==============================================================
+subroutine compute_areas()
   subroutine compute_areas()
     integer(kind=ikind) :: i
     integer(kind=ikind) :: n1, n2, n3
@@ -126,7 +132,10 @@ contains
     area = 0.5_rkind * abs(a(1)*(b(2)-c(2)) + b(1)*(c(2)-a(2)) + c(1)*(a(2)-b(2)))
   end function area_triangle
 
-
+!==============================================================
+!   COMPUTE average altitude per element
+!==============================================================
+subroutine compute_areas()
   subroutine compute_avgalt()
     integer(kind=ikind) :: i, n1, n2, n3
     real(kind=rkind) :: z1, z2, z3
@@ -150,7 +159,10 @@ contains
     end do
   end subroutine compute_avgalt
 
-
+!==============================================================
+!   FLOW TOPOLOGY INITIALIZATION
+!==============================================================
+subroutine init_flow_topology()
     subroutine init_flow_topology()
     integer(kind=ikind) :: nel, i
 
@@ -191,7 +203,10 @@ contains
     call build_upstream_graph()
   end subroutine init_flow_topology
 
-
+!==============================================================
+!   built downstream graph based on lowest neighbour
+!==============================================================
+subroutine init_flow_topology()
   subroutine build_downstream_graph()
     integer(kind=ikind) :: i, j, nb, nel
     real(kind=rkind)    :: myz, bestz
@@ -282,7 +297,10 @@ contains
     l = sqrt((A(1)-B(1))*(A(1)-B(1)) + (A(2)-B(2))*(A(2)-B(2)))
   end function dist
 
-
+!==============================================================
+!   build graph
+!==============================================================
+subroutine init_flow_topology()
   subroutine build_graph()
     integer(kind=ikind) :: el, i
     integer(kind=ikind), dimension(3) :: ngh
@@ -338,6 +356,10 @@ contains
     
   end subroutine build_graph
 
+ !==============================================================
+!   Build flow order based on elevation (highest first)
+!==============================================================
+subroutine init_flow_topology() 
   subroutine build_flow_order()
     integer(kind=ikind) :: nel, i, j, tmp_idx
     real(kind=rkind)    :: tmp_z
@@ -365,7 +387,10 @@ contains
     deallocate(idx, z)
   end subroutine build_flow_order
 
-
+!==============================================================
+!   Build upstream graph
+!==============================================================
+subroutine init_flow_topology()
   subroutine build_upstream_graph()
     integer(kind=ikind) :: nel, i, j, max_up
 
@@ -405,7 +430,10 @@ contains
     end if
   end subroutine build_upstream_graph
 
-
+!==============================================================
+!   Print upstream flows for diagnostics
+!==============================================================
+subroutine init_flow_topology()
   subroutine print_upstream_flows()
     integer(kind=ikind) :: nel, e, k
     real(kind=rkind)    :: Qin_from_up
@@ -434,11 +462,16 @@ contains
           end do
        end if
 
-       write(*,'(I3,1X,I4,3F14.6)') e, upstream_count(e), Qin_from_up, &
+       print *, e, upstream_count(e), Qin_from_up, &
             elements%hydrobal(e)%inflow, elements%hydrobal(e)%outflow
     end do
   end subroutine print_upstream_flows
 
+
+!==============================================================
+!   Print graph diagnostics (downstream/upstream neighbours, slopes, widths)
+!==============================================================
+subroutine init_flow_topology()
     subroutine print_graph_diagnostics()
     integer(kind=ikind) :: el, i, nb
     real(kind=rkind)    :: width, slope, nalt
@@ -457,8 +490,7 @@ contains
              slope = elements%downstream(el)%slopes(i)
              nalt  = elements%avgalt(nb)
 
-             write(*,'(I4,1X,I4,1X,A4,3X,4F12.6)') el, nb, "down", &
-                  elements%avgalt(el), nalt, slope, width
+             print *, el, nb, "down", elements%avgalt(el), nalt, slope, width
           end if
 
           ! upstream neighbours stored in elements%upstream(el)
@@ -468,8 +500,7 @@ contains
              slope = elements%upstream(el)%slopes(i)
              nalt  = elements%avgalt(nb)
 
-             write(*,'(I4,1X,I4,1X,A4,3X,4F12.6)') el, nb, "up", &
-                  elements%avgalt(el), nalt, slope, width
+             print *, el, nb, "up", elements%avgalt(el), nalt, slope, width
           end if
 
        end do
@@ -479,6 +510,10 @@ contains
   end subroutine print_graph_diagnostics
 
 
+!==============================================================
+!  Print element balance
+!==============================================================
+subroutine init_flow_topology()
   subroutine print_element_balance()
     integer(kind=ikind) :: i
     real(kind=rkind)    :: surplus
@@ -517,11 +552,15 @@ contains
        return
     end if
 
-    open(newunit=unit, file=filename, status="replace", action="write")
+    open(newunit=unit, file=filename, status="replace", action="write", iostat=ios)
+  if (ios /= 0) then
+     print *, "Error opening file: ", trim(filename)
+     return
+  end if
 
-    write(unit,'(A)') "Element,Area,z_avg,Downstream," // &
-                      "P,ET,Qsurf,Li,Qgw,Qin,Surplus," // &
-                      "Qout_elem,Qout_catchment,Overflow,DeltaS,Qsurf_local"
+  write(unit,'(A)') "Element,Area,z_avg,Downstream," // &
+                    "P,ET,Qsurf,Li,Qgw,Qin,Surplus," // &
+                    "Qout_elem,Qout_catchment,Overflow,DeltaS,Qsurf_local"
 
     do i = 1_ikind, elements%kolik
        surplus = elements%hydrobal(i)%Qsurf + &
@@ -557,9 +596,12 @@ contains
     print *, " Element balances saved to: ", trim(filename)
   end subroutine export_element_balance
 
-
-  subroutine route_step(tstep)
-    integer(kind=ikind), intent(in) :: tstep
+!==============================================================
+!   Routing
+!==============================================================
+subroutine init_flow_topology()
+  subroutine route_step(n_days)
+    integer(kind=ikind), intent(in) :: n_days
 
     integer(kind=ikind) :: el, i, dwn
     real(kind=rkind)    :: old_storage, local_input, local_losses, surplus
@@ -577,7 +619,7 @@ contains
     do el = 1_ikind, elements%kolik
        old_storage = storage(el)
 
-       local_input = precip(el,tstep) + qinter(el,tstep) + old_storage
+       local_input = precip(el,n_days) + qinter(el,n_days) + old_storage
 
        local_losses = elements%hydrobal(el)%ET + &
                       elements%hydrobal(el)%Li + &
@@ -598,10 +640,10 @@ contains
           end if
        end if
 
-       overflow_total(el) = surplus + Qsurf_result(el,tstep)
+       overflow_total(el) = surplus + Qsurf_result(el,n_days)
     end do
 
-    outlet_Q(tstep) = 0.0_rkind
+    outlet_Q(n_days) = 0.0_rkind
 
     do i = 1_ikind, elements%kolik
        el  = flow_order(i)
@@ -613,7 +655,7 @@ contains
           elements%hydrobal(dwn)%inflow = elements%hydrobal(dwn)%inflow + &
                                           elements%hydrobal(el)%outflow
        else
-          outlet_Q(tstep) = outlet_Q(tstep) + elements%hydrobal(el)%outflow
+          outlet_Q(n_days) = outlet_Q(n_days) + elements%hydrobal(el)%outflow
        end if
     end do
 
@@ -622,8 +664,8 @@ contains
        storage(el)           = storage_new(el)
        elements%overflow(el) = overflow_total(el)
 
-       elements%hydrobal(el)%deltas = precip(el,tstep) + &
-                                      qinter(el,tstep) + &
+       elements%hydrobal(el)%deltas = precip(el,n_days) + &
+                                      qinter(el,n_days) + &
                                       old_storage + &
                                       elements%hydrobal(el)%inflow - &
                                       ( elements%hydrobal(el)%ET      + &
@@ -632,7 +674,7 @@ contains
                                         storage(el)                   + &
                                         elements%hydrobal(el)%outflow )
 
-       deltas(el,tstep) = elements%hydrobal(el)%deltas
+       deltas(el,n_days) = elements%hydrobal(el)%deltas
     end do
 
     deallocate(overflow_total, storage_new)

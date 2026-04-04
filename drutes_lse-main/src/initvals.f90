@@ -15,8 +15,8 @@ contains
     allocate( qinter(elements%kolik, n_days) )
     allocate( qout(elements%kolik, n_days) )
 
-    allocate( conduct(elements%kolik) )
-    allocate( G(elements%kolik) )
+    allocate( conduct(elements%kolik, n_days) )
+    allocate( G(elements%kolik, n_days) )
 
     allocate( Tmax(elements%kolik, n_days) )
     allocate( Tmin(elements%kolik, n_days) )

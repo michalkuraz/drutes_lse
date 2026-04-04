@@ -77,7 +77,7 @@ module globals
   ! Simulation time discretisation
   integer(kind=ikind), parameter :: ntot_days = 10
   real(kind=rkind),   parameter :: dt_days   = 1.0_rkind
-  integer(kind=ikind), parameter :: n_days = int(ntot_days / dt_days)
+  integer(kind=ikind), parameter :: n_steps = int(ntot_days / dt_days)
   integer(kind=ikind) :: CN, Julian_day 
   real(kind=rkind) :: phi, as, bs, z, alpha, sigma, gsc, ccrop
 

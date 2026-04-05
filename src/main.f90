@@ -2,7 +2,6 @@
 program nour
   use typy
   use globals
-  use initvals
   use hydrofnc
   use tools
   implicit none

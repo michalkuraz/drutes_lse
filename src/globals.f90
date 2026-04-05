@@ -58,7 +58,9 @@ module globals
   type(nodes_str)    :: nodes
   type(elements_str) :: elements
   
-    real(kind=rkind), dimension(:), allocatable :: meteotime
+  
+  
+  real(kind=rkind), dimension(:), allocatable :: meteotime
   
   
   
@@ -87,7 +89,7 @@ module globals
 
   ! Element-based hydro inputs & outputs (time series)
 
-  ! Element-based hydrodata_str inputs & outputs (time series)
+  ! Element-based hydro inputs & outputs (time series)
   real(kind=rkind), allocatable :: precip(:,:), qinter(:,:), qout(:,:)
   real(kind=rkind), allocatable :: conduct(:), G(:), Tmax(:,:), Tmin(:,:), Tmean(:,:)
   real(kind=rkind), allocatable :: RHmax(:,:), RHmin(:,:), uz(:,:), soilcontent(:,:)
@@ -101,10 +103,6 @@ module globals
   ! NEW: upstream connectivity
   integer(kind=ikind), allocatable :: upstream_count(:)
   integer(kind=ikind), allocatable :: upstream_list(:,:)
-
-  ! routed quantities
-  real(kind=rkind), allocatable :: Qin_result(:,:), Qout_result(:,:), &
-                                 Overflow_result(:,:), Storage_result(:,:)
 
 
   ! ---------- Configuration structure (kept from DRUtES style) ----------

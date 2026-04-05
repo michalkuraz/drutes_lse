@@ -35,7 +35,7 @@ contains
     integer(kind=ikind), intent(in)          :: Julian_day,dt_days
     real(kind=rkind) :: dr, delta, ws
 
-    dr    = 1._rkind + 0.033_rkind * cos(2._rkind*PI_RKIND*Julian_day/365._rkind)
+    dr    = 1._rkind + 0.033_rkind * cos(2._rkind*PI_RKIND*Julian_day *dt_days/365._rkind)
     delta = 0.409_rkind * sin(2._rkind*PI_RKIND*Julian_day *dt_days/365._rkind - 1.39_rkind)
     ws    = acos(-tan(phi)*tan(delta))
 

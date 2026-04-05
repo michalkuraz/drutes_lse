@@ -41,13 +41,13 @@ program nour
   print *, "-----------------------------------------------"
   print *, " Node Coordinates"
   do i = 1, nodes%kolik
-     print '(I4,3F10.3)', i, nodes%data(i,1), nodes%data(i,2), nodes%altitude(i)
+     print *, i, nodes%data(i,1), nodes%data(i,2), nodes%altitude(i)
   end do
 
   print *, "-----------------------------------------------"
   print *, " Element Areas & avg z"
   do i = 1, elements%kolik
-     print '(I4, 2F12.3)', i, elements%area(i), elements%avgalt(i)
+     print *, i, elements%area(i), elements%avgalt(i)
   end do
 
   ! ----------------------------------------------------
@@ -62,9 +62,9 @@ program nour
   print *, " Downstream Graph"
   do i = 1, elements%kolik
      if (downstream(i) > 0) then
-        write(*,'(A,I3,A,I3)') " Element ", i, " drains to element ", downstream(i)
+        print*, " Element ", i, " drains to element ", downstream(i)
      else
-        write(*,'(A,I3,A)') " Element ", i, " drains to outlet"
+        print*, " Element ", i, " drains to outlet"
      end if
   end do
 
@@ -85,7 +85,7 @@ program nour
   ! ----------------------------------------------------
   ! 5) Print and export results
   ! ----------------------------------------------------
-  print *, "--------------------------------------------------------------------------------------------------------------"
+    print *, "--------------------------------------------------------------------------------------------------------------"
   print *, " Element |     P        ET      Qsurf       Li       Qgw      Qin     Surplus " // &
          " Qout_elem  Qout_catch  Overflow   deltaS"
   print *, "--------------------------------------------------------------------------------------------------------------"
@@ -104,8 +104,8 @@ program nour
         qout_catch = 0.0_rkind
      end if
 
-     write(*,'(I7,11F12.6)') i, &
-          precip(i,1), elements%hydrobal(i)%ET, &
+     print*, i, &
+          precip(i,n_steps), elements%hydrobal(i)%ET, &
           elements%hydrobal(i)%Qsurf, elements%hydrobal(i)%Li, &
           elements%hydrobal(i)%Qgw, elements%hydrobal(i)%inflow, &
           surplus, elements%hydrobal(i)%outflow, &
@@ -113,14 +113,14 @@ program nour
           elements%hydrobal(i)%deltas
   end do
 
-
+ call export_element_balance("element_balance.csv", n_steps)    ! from tools
   print *, "-----------------------------------------------"
   print *, " Element |  z_avg   Qsurf_local"
   do i = 1, elements%kolik
-     write(*,'(I7,2F14.6)') i, elements%avgalt(i), Qsurf_result(i,1)
+     print *, i, elements%avgalt(i), Qsurf_result(i,n_steps)
   end do
 
-  call export_element_balance("element_balance.csv")  ! from tools
+  
 
 
   print *, "-----------------------------------------------"

@@ -58,46 +58,66 @@ contains
 
     storage  = 0.0_rkind
     outlet_Q = 0.0_rkind
-    
+
+    !!routed quantities
+    allocate(Qin_result(elements%kolik, n_steps))
+    allocate(Qout_result(elements%kolik, n_steps))
+    allocate(Overflow_result(elements%kolik, n_steps))
+    allocate(Storage_result(elements%kolik, n_steps))
+
+    Qin_result      = 0.0_rkind
+    Qout_result     = 0.0_rkind
+    Overflow_result = 0.0_rkind
+    Storage_result  = 0.0_rkind
+
 
     ! Simple default capacity [mm]
     capacity = 5.0_rkind
 
     ! Example meteorological inputs (same structure as before)
-    precip = reshape([0.0_rkind, 0.0_rkind, 17.0_rkind, 12.0_rkind, 9.0_rkind, 7.0_rkind, &
-                      40.0_rkind, 0.0_rkind, 0.0_rkind, 3.0_rkind], [elements%kolik, n_steps])
+   precip = 0.0_rkind
+   qinter = 0.0_rkind
+   uz = 0.0_rkind
+   Tmax = 0.0_rkind
+   Tmin = 0.0_rkind
+   Tmean = 0.0_rkind
+   RHmax = 0.0_rkind
+   RHmin = 0.0_rkind
+   soilcontent = 0.0_rkind
 
-    qinter = reshape([0.0_rkind, 0.0_rkind, 0.015_rkind, 0.018_rkind, 0.02_rkind, 0.022_rkind, &
-                      0.025_rkind, 0.0235_rkind, 0.03_rkind, 0.031_rkind], [elements%kolik, n_steps])
+  do i = 1, elements%kolik
+   conduct(i) = 0.000005_rkind
+   G(i)       = 0.0_rkind
+ end do
 
-    qout = 0.0_rkind   ! no prescribed outflow, routing computes it
+do i = 1, elements%kolik
+   precip(i,1:n_steps) = [0.0_rkind, 0.0_rkind, 17.0_rkind, 12.0_rkind, 9.0_rkind, &
+                     7.0_rkind, 40.0_rkind, 0.0_rkind, 0.0_rkind, 3.0_rkind]
 
-    conduct = 0.000005_rkind
-    G       = 0.0_rkind
+   qinter(i,1:n_steps) = [0.0_rkind, 0.0_rkind, 0.015_rkind, 0.018_rkind, 0.02_rkind, &
+                     0.022_rkind, 0.025_rkind, 0.0235_rkind, 0.03_rkind, 0.031_rkind]
 
-    uz = reshape([4.38_rkind, 3.57_rkind, 4.026_rkind, 3.097_rkind, 4.14_rkind, &
-                  3.13_rkind, 3.92_rkind, 3.19_rkind, 3.98_rkind, 3.34_rkind], &
-                  [elements%kolik, n_steps])
+   uz(i,1:n_steps) = [4.38_rkind, 3.57_rkind, 4.026_rkind, 3.097_rkind, 4.14_rkind, &
+                 3.13_rkind, 3.92_rkind, 3.19_rkind, 3.98_rkind, 3.34_rkind]
 
-    Tmax = reshape([19.1_rkind, 15.3_rkind, 12.8_rkind, 11.8_rkind, 10.5_rkind, 15.2_rkind, &
-                    11.6_rkind, 14.6_rkind, 17.2_rkind, 16.4_rkind], [elements%kolik, n_steps])
+   Tmax(i,1:n_steps) = [19.1_rkind, 15.3_rkind, 12.8_rkind, 11.8_rkind, 10.5_rkind, &
+                   15.2_rkind, 11.6_rkind, 14.6_rkind, 17.2_rkind, 16.4_rkind]
 
-    Tmin = reshape([5.4_rkind, 6.8_rkind, 8.8_rkind, 7.6_rkind, 8.4_rkind, 8.3_rkind, &
-                    8.8_rkind, 6.2_rkind, 4.8_rkind, 6.2_rkind], [elements%kolik, n_steps])
+   Tmin(i,1:n_steps) = [5.4_rkind, 6.8_rkind, 8.8_rkind, 7.6_rkind, 8.4_rkind, &
+                   8.3_rkind, 8.8_rkind, 6.2_rkind, 4.8_rkind, 6.2_rkind]
 
-    Tmean = reshape([12.25_rkind, 11.05_rkind, 10.8_rkind, 9.7_rkind, 9.45_rkind, 11.75_rkind, &
-                     10.2_rkind, 10.4_rkind, 11.0_rkind, 9.7_rkind], [elements%kolik, n_steps])
+   Tmean(i,1:n_steps) = [12.25_rkind, 11.05_rkind, 10.8_rkind, 9.7_rkind, 9.45_rkind, &
+                    11.75_rkind, 10.2_rkind, 10.4_rkind, 11.0_rkind, 9.7_rkind]
 
-    RHmax = reshape([84.0_rkind, 85.0_rkind, 76.0_rkind, 87.0_rkind, 92.0_rkind, &
-                     94.0_rkind, 97.0_rkind, 92.0_rkind, 93.0_rkind, 97.0_rkind], &
-                     [elements%kolik, n_steps])
+   RHmax(i,1:n_steps) = [84.0_rkind, 85.0_rkind, 76.0_rkind, 87.0_rkind, 92.0_rkind, &
+                    94.0_rkind, 97.0_rkind, 92.0_rkind, 93.0_rkind, 97.0_rkind]
 
-    RHmin = reshape([56.0_rkind, 64.0_rkind, 64.0_rkind, 77.0_rkind, 77.0_rkind, 76.0_rkind, &
-                     74.0_rkind, 59.0_rkind, 62.0_rkind, 61.0_rkind], [elements%kolik, n_steps])
+   RHmin(i,1:n_steps) = [56.0_rkind, 64.0_rkind, 64.0_rkind, 77.0_rkind, 77.0_rkind, &
+                    76.0_rkind, 74.0_rkind, 59.0_rkind, 62.0_rkind, 61.0_rkind]
 
-    soilcontent = reshape([0.05_rkind, 0.055_rkind, 0.062_rkind, 0.06_rkind, 0.04_rkind, 0.07_rkind, &
-                           0.09_rkind, 0.2_rkind, 0.25_rkind, 0.265_rkind], [elements%kolik, n_steps])
-
+   soilcontent(i,1:n_steps) = [0.05_rkind, 0.055_rkind, 0.062_rkind, 0.06_rkind, 0.04_rkind, &
+                          0.07_rkind, 0.09_rkind, 0.2_rkind, 0.25_rkind, 0.265_rkind]
+end do
     ! Constants
     CN         = 98
     z          = 3.0_rkind

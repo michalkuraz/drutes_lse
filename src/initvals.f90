@@ -58,18 +58,7 @@ contains
 
     storage  = 0.0_rkind
     outlet_Q = 0.0_rkind
-
-    !!routed quantities
-    allocate(Qin_result(elements%kolik, n_steps))
-    allocate(Qout_result(elements%kolik, n_steps))
-    allocate(Overflow_result(elements%kolik, n_steps))
-    allocate(Storage_result(elements%kolik, n_steps))
-
-    Qin_result      = 0.0_rkind
-    Qout_result     = 0.0_rkind
-    Overflow_result = 0.0_rkind
-    Storage_result  = 0.0_rkind
-
+    
 
     ! Simple default capacity [mm]
     capacity = 5.0_rkind

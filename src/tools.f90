@@ -568,7 +568,7 @@ subroutine export_element_balance(filename, n_steps)
         qout_catch = 0.0_rkind
      end if
 
-     write(unit,'(I4, ",", F10.3, ",", F10.3, ",", I4, 12(",",F10.3))') &
+     print*, &
           i,                              &
           elements%area(i),               &
           elements%avgalt(i),             &
@@ -598,7 +598,7 @@ subroutine route_step(n_steps)
     integer(kind=ikind), intent(in) :: n_steps
 
     integer(kind=ikind) :: el, i, dwn
-    real(kind=rkind)    :: old_storage, local_input, local_losses, surplus, qinter 
+    real(kind=rkind)    :: old_storage, local_input, local_losses, surplus 
     real(kind=rkind), allocatable :: overflow_total(:), storage_new(:)
 
     allocate(overflow_total(elements%kolik))

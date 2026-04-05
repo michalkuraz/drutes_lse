@@ -505,7 +505,7 @@ subroutine init_flow_topology()
 subroutine print_element_balance(n_steps)
   integer(kind=ikind), intent(in) :: n_steps
   integer(kind=ikind) :: i
-  real(kind=rkind)    :: surplus, precip
+  real(kind=rkind)    :: surplus
 
   if (.not. allocated(elements%hydrobal)) then
      print *, "No hydrological data to display."
@@ -521,13 +521,14 @@ subroutine print_element_balance(n_steps)
                elements%hydrobal(i)%Li    + &
                elements%hydrobal(i)%Qgw
 
-     write(*,'(I7,10F12.6)') i, precip(i,n_steps), elements%hydrobal(i)%ET, &
-          elements%hydrobal(i)%Qsurf, elements%hydrobal(i)%Li, &
-          elements%hydrobal(i)%Qgw, elements%hydrobal(i)%inflow, &
-          surplus, elements%hydrobal(i)%outflow, &
-          elements%overflow(i), &
-          elements%hydrobal(i)%deltas
+     print *, i, precip(i,n_steps), elements%hydrobal(i)%ET, &
+              elements%hydrobal(i)%Qsurf, elements%hydrobal(i)%Li, &
+              elements%hydrobal(i)%Qgw, elements%hydrobal(i)%inflow, &
+              surplus, elements%hydrobal(i)%outflow, &
+              elements%overflow(i), &
+              elements%hydrobal(i)%deltas
   end do
+
 end subroutine print_element_balance
 
 
@@ -539,7 +540,7 @@ subroutine export_element_balance(filename, n_steps)
   integer(kind=ikind), intent(in) :: n_steps
   integer(kind=ikind) :: i
   integer :: unit, ios
-  real(kind=rkind) :: surplus, qout_catch, precip
+  real(kind=rkind) :: surplus, qout_catch
 
   if (.not. allocated(elements%hydrobal)) then
      print *, "No hydrological data to export."
@@ -597,7 +598,7 @@ subroutine route_step(n_steps)
     integer(kind=ikind), intent(in) :: n_steps
 
     integer(kind=ikind) :: el, i, dwn
-    real(kind=rkind)    :: old_storage, local_input, local_losses, surplus, qinter, precip 
+    real(kind=rkind)    :: old_storage, local_input, local_losses, surplus, qinter 
     real(kind=rkind), allocatable :: overflow_total(:), storage_new(:)
 
     allocate(overflow_total(elements%kolik))

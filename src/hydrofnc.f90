@@ -30,13 +30,13 @@ contains
     wind2m = uz_meas * 4.87_rkind / log(67.8_rkind*z_meas - 5.42_rkind)
   end function wind2m
 
-  pure real(kind=rkind) function Ra_daily(phi, Julian_day)
+  pure real(kind=rkind) function Ra_daily(phi, Julian_day,dt_days)
     real(kind=rkind), intent(in) :: phi
-    integer(kind=ikind), intent(in)          :: Julian_day
+    integer(kind=ikind), intent(in)          :: Julian_day,dt_days
     real(kind=rkind) :: dr, delta, ws
 
     dr    = 1._rkind + 0.033_rkind * cos(2._rkind*PI_RKIND*Julian_day/365._rkind)
-    delta = 0.409_rkind * sin(2._rkind*PI_RKIND*Julian_day/365._rkind - 1.39_rkind)
+    delta = 0.409_rkind * sin(2._rkind*PI_RKIND*Julian_day *dt_days/365._rkind - 1.39_rkind)
     ws    = acos(-tan(phi)*tan(delta))
 
     Ra_daily = (24._rkind*60._rkind/PI_RKIND) * gsc * dr * &
@@ -51,26 +51,31 @@ contains
                 (1.35_rkind*min(Rs/Rso, 1._rkind) - 0.35_rkind)
   end function Rnl_daily
 
-  pure real(kind=rkind) function penman_monteith(element, day)
-    integer(kind=ikind), intent(in) :: element, day
+  !==============================================================
+!  Penman Monteith function for ET estimation
+!==============================================================
+  pure real(kind=rkind) function penman_monteith(element, dt_days)
+    integer(kind=ikind), intent(in) :: element, dt_days
     real(kind=rkind) :: es_Tmax, es_Tmin, es, ea
     real(kind=rkind) :: delta, gamma, u2, Ra, Rs, Rso
     real(kind=rkind) :: Rns, Rnl, Rn, G0
     real(kind=rkind) :: L1, L2, L3, L4, nN
+    integer(kind=ikind) :: t
+  
 
-    es_Tmax = esat(Tmax(element,day))
-    es_Tmin = esat(Tmin(element,day))
+    es_Tmax = esat(Tmax(element,dt_days))
+    es_Tmin = esat(Tmin(element,dt_days))
 
     es = 0.5_rkind*(es_Tmax + es_Tmin)
 
-    ea = (es_Tmin*RHmax(element,day) + es_Tmax*RHmin(element,day)) / 200._rkind
+    ea = (es_Tmin*RHmax(element,dt_days) + es_Tmax*RHmin(element,dt_days)) / 200._rkind
 
-    delta = slope_vp(Tmean(element,day))
+    delta = slope_vp(Tmean(element,dt_days))
     gamma = psychro_const(z)
 
-    u2 = wind2m(uz(element,day), z)
+    u2 = wind2m(uz(element,dt_days), z)
 
-    Ra = Ra_daily(phi, Julian_day)
+    Ra = Ra_daily(phi , Julian_day, dt_days)
 
     ! actual/possible sunshine ratio (simplified)
     nN = 1._rkind
@@ -80,65 +85,74 @@ contains
 
     Rns = (1._rkind - alpha) * Rs
 
-    Rnl = Rnl_daily( Tmax(element,day)+273.16_rkind, &
-                     Tmin(element,day)+273.16_rkind, ea, Rs, Rso )
+    Rnl = Rnl_daily( Tmax(element,dt_days)+273.16_rkind, &
+                     Tmin(element,dt_days)+273.16_rkind, ea, Rs, Rso )
 
     Rn = max(Rns - Rnl, 0.0_rkind)
 
-    G0 = G(element,day)
+    G0 = G(element)
 
     L1 = 0.408_rkind * delta * (Rn - G0)
-    L2 = gamma * (900._rkind / (Tmean(element,day) + 273._rkind)) * u2 * (es - ea)
+    L2 = gamma * (900._rkind / (Tmean(element,dt_days) + 273._rkind)) * u2 * (es - ea)
     L3 = L1 + L2
     L4 = delta + gamma * (1._rkind + 0.34_rkind*u2)
 
     penman_monteith = max(L3 / L4, 0.0_rkind)
   end function penman_monteith
 
-  pure real(kind=rkind) function surface_runoff(element, day)
-    integer(kind=ikind), intent(in) :: element, day
+  !==============================================================
+!  Surface runoff using SCS-CN method
+!==============================================================
+  pure real(kind=rkind) function surface_runoff(element, dt_days)
+    integer(kind=ikind), intent(in) :: element, dt_days
     real(kind=rkind) :: S, I
     S = (25400._rkind / CN) - 254._rkind
     I = 0.2_rkind * S
 
-    if (precip(element,day) <= I) then
+    if (precip(element,dt_days) <= I) then
        surface_runoff = 0._rkind
     else
-       surface_runoff = (precip(element,day) - I)**2 / &
-                        (precip(element,day) - I + S)
+       surface_runoff = (precip(element,dt_days) - I)**2 / &
+                        (precip(element,dt_days) - I + S)
     end if
   end function surface_runoff
 
-  pure real(kind=rkind) function ground_water(element, day)
-    integer(kind=ikind), intent(in) :: element, day
-    ground_water = conduct(element,day) * soilcontent(element,day)
+  !==============================================================
+!  Ground water function (simple linear reservoir)
+!==============================================================
+  pure real(kind=rkind) function ground_water(element, dt_days)
+    integer(kind=ikind), intent(in) :: element, dt_days
+    ground_water = conduct(element) * soilcontent(element,dt_days)
   end function ground_water
 
-  pure real(kind=rkind) function leakage(element, day)
-    integer(kind=ikind), intent(in) :: element, day
-    leakage = max(0._rkind, qinter(element,day) + precip(element,day) - &
-                           ET_flux(element,day) - Qsurf_result(element,day))
+  !==============================================================
+!  Leakage function (excess water that is not ET or surface runoff)
+!==============================================================
+  pure real(kind=rkind) function leakage(element, dt_days)
+    integer(kind=ikind), intent(in) :: element, dt_days
+    leakage = max(0._rkind, qinter(element,dt_days) + precip(element,dt_days) - &
+                           ET_flux(element,dt_days) - Qsurf_result(element,dt_days))
   end function leakage
 
   ! ---- Main driver: compute all steps with routing ----
   subroutine compute_all()
     use tools
-    integer(kind=ikind) :: el
+    integer(kind=ikind) :: el, t
 
-    do dt_days = 1, ntot_days
+    do t = 1, ntot_days
 
        ! 1) Local fluxes per element
        do el = 1, elements%kolik
-          elements%hydrobal(el)%ET    = penman_monteith(el,dt_days) * ccrop
-          elements%hydrobal(el)%Qsurf = surface_runoff(el,dt_days)
-          elements%hydrobal(el)%Li    = leakage(el,dt_days)
-          elements%hydrobal(el)%Qgw   = ground_water(el,dt_days)
+          elements%hydrobal(el)%ET    = penman_monteith(el,t) * ccrop
+          elements%hydrobal(el)%Qsurf = surface_runoff(el,t)
+          elements%hydrobal(el)%Li    = leakage(el,t)
+          elements%hydrobal(el)%Qgw   = ground_water(el,t)
 
           ! keep legacy arrays
-          ET_flux(el,dt_days)      = elements%hydrobal(el)%ET
-          Qsurf_result(el,dt_days) = elements%hydrobal(el)%Qsurf
-          L_result(el,dt_days)     = elements%hydrobal(el)%Li
-          Qgw_result(el,dt_days)   = elements%hydrobal(el)%Qgw
+          ET_flux(el,t)      = elements%hydrobal(el)%ET
+          Qsurf_result(el,t) = elements%hydrobal(el)%Qsurf
+          L_result(el,t)     = elements%hydrobal(el)%Li
+          Qgw_result(el,t)   = elements%hydrobal(el)%Qgw
 
           elements%hydrobal(el)%inflow  = 0.0_rkind
           elements%hydrobal(el)%outflow = 0.0_rkind
@@ -146,7 +160,7 @@ contains
        end do
 
        ! 2) Routing + mass balance
-       call route_step(dt_days)
+       call route_step(n_steps)
 
     end do
 

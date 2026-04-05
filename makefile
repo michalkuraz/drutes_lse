@@ -5,7 +5,7 @@ FC     = gfortran
 FFLAGS = -fimplicit-none  -fcoarray=single -fbounds-check -fbacktrace -g -g3 -fdefault-real-8 -O0 -finit-real=nan -Wsurprising
 FFLAGS += -Werror=line-truncation
 
-OBJS = typy.o datetime.o globals.o core_tools.o debug_tools.o printtools.o geom_tools.o tools.o \
+OBJS = typy.o  globals.o core_tools.o debug_tools.o printtools.o  tools.o \
        initvals.o hydrofnc.o readtools.o main.o 
 
 TARGET = nour_model
@@ -18,10 +18,6 @@ $(TARGET): $(OBJS)
 typy.o: src/typy.f90
 	$(FC) $(FFLAGS) -c src/typy.f90
 	
-datetime.o: typy.o src/datetime.f90
-	$(FC) $(FFLAGS) -c src/datetime.f90
-
-
 globals.o: src/globals.f90 typy.o
 	$(FC) $(FFLAGS) -c src/globals.f90
 
@@ -37,8 +33,6 @@ readtools.o: src/readtools.f90 typy.o globals.o core_tools.o debug_tools.o
 printtools.o: src/printtools.f90 typy.o globals.o core_tools.o debug_tools.o
 	$(FC) $(FFLAGS) -c src/printtools.f90
 
-geom_tools.o: src/geom_tools.f90 typy.o globals.o printtools.o core_tools.o debug_tools.o
-	$(FC) $(FFLAGS) -c src/geom_tools.f90
 
 tools.o: src/tools.f90 typy.o globals.o geom_tools.o
 	$(FC) $(FFLAGS) -c src/tools.f90

@@ -58,6 +58,7 @@ contains
 
     storage  = 0.0_rkind
     outlet_Q = 0.0_rkind
+    
 
     ! Simple default capacity [mm]
     capacity = 5.0_rkind

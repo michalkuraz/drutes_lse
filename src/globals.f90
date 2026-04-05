@@ -8,10 +8,6 @@ module globals
   logical          :: www
   
   
-  
-
-    
-    
 
   ! ---------- Node structure ----------
   type :: nodes_str

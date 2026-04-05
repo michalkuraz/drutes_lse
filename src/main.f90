@@ -8,7 +8,7 @@ program nour
   use geom_tools
   implicit none
 
-   integer(kind=ikind) :: i, nc
+   integer(kind=ikind) :: i, nc,t
    integer :: unit
    character(len=256)  :: mesh_file_name
    logical             :: file_exists
@@ -85,7 +85,7 @@ program nour
   ! ----------------------------------------------------
   ! 5) Print and export results
   ! ----------------------------------------------------
-    print *, "--------------------------------------------------------------------------------------------------------------"
+      print *, "--------------------------------------------------------------------------------------------------------------"
   print *, " Element |     P        ET      Qsurf       Li       Qgw      Qin     Surplus " // &
          " Qout_elem  Qout_catch  Overflow   deltaS"
   print *, "--------------------------------------------------------------------------------------------------------------"
@@ -111,13 +111,14 @@ program nour
           surplus, elements%hydrobal(i)%outflow, &
           qout_catch, elements%overflow(i), &
           elements%hydrobal(i)%deltas
+          
   end do
 
  call export_element_balance("element_balance.csv", n_steps)    ! from tools
   print *, "-----------------------------------------------"
   print *, " Element |  z_avg   Qsurf_local"
   do i = 1, elements%kolik
-     print *, i, elements%avgalt(i), Qsurf_result(i,n_steps)
+   print *, i, elements%avgalt(i), Qsurf_result(i,n_steps)
   end do
 
   
@@ -126,16 +127,13 @@ program nour
   print *, "-----------------------------------------------"
   print *, " Catchment outlet hydrograph (per time step):"
   do i = 1, n_steps
-     print '(A,I3,A,F12.6)', " step ", i, "  Q_out = ", outlet_Q(i)
+     print *, " step ", i, "  Q_out = ", outlet_Q(i)
   end do
     ! Export outlet hydrograph to CSV
   open(newunit=unit, file="outlet_hydrograph.csv", status="replace", action="write")
   write(unit,'(A)') "step,Q_out"
 
-  do i = 1, n_steps
-     write(unit,'(I4,",",F12.6)') i, outlet_Q(i)
-  end do
-
+  
   close(unit)
   print *, " Outlet hydrograph saved to: outlet_hydrograph.csv"
 

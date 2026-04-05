@@ -5,7 +5,6 @@ program nour
   use initvals
   use hydrofnc
   use tools
-  use geom_tools
   implicit none
 
    integer(kind=ikind) :: i, nc,t

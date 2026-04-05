@@ -58,9 +58,7 @@ module globals
   type(nodes_str)    :: nodes
   type(elements_str) :: elements
   
-  
-  
-  real(kind=rkind), dimension(:), allocatable :: meteotime
+    real(kind=rkind), dimension(:), allocatable :: meteotime
   
   
   
@@ -103,6 +101,10 @@ module globals
   ! NEW: upstream connectivity
   integer(kind=ikind), allocatable :: upstream_count(:)
   integer(kind=ikind), allocatable :: upstream_list(:,:)
+
+  ! routed quantities
+  real(kind=rkind), allocatable :: Qin_result(:,:), Qout_result(:,:), &
+                                 Overflow_result(:,:), Storage_result(:,:)
 
 
   ! ---------- Configuration structure (kept from DRUtES style) ----------

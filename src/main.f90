@@ -34,9 +34,9 @@ program nour
   ! ----------------------------------------------------
   ! 1) Read mesh & compute geometry
   ! ----------------------------------------------------
-  call read_mesh(mesh_file_name)
-  call compute_areas()
-  call compute_avgalt()
+  call read_mesh(mesh_file_name)   ! from tools
+  call compute_areas()             ! from tools
+  call compute_avgalt()            ! from tools
 
   print *, "-----------------------------------------------"
   print *, " Node Coordinates"
@@ -54,8 +54,8 @@ program nour
   ! 2) Flow topology (neighbours, downstream, order)
   ! ----------------------------------------------------
   drutes_config%dimen = 2
-  call init_flow_topology()
-  call print_graph_diagnostics()
+  call init_flow_topology()          !from tools
+  call print_graph_diagnostics()     ! from tools
   
 
   print *, "-----------------------------------------------"
@@ -69,23 +69,21 @@ program nour
   end do
 
   ! ----------------------------------------------------
-   ! 4) Initialize hydrological inputs and parameters
+   ! 3) Initialize hydrological inputs and parameters
   !     (from your initvals module)
-  call init_hydro()   ! <-- new name
+  ! ---------------------------------------------------
+  call init_hydro()    ! from initvals
 
     
+  ! ----------------------------------------------------
+  ! 4) Compute hydrological balance + routing
+  ! ----------------------------------------------------
+  call compute_all()       ! from hydrofunction
 
-
+  call print_upstream_flows()    ! from tools
 
   ! ----------------------------------------------------
-  ! 5) Compute hydrological balance + routing
-  ! ----------------------------------------------------
-  call compute_all()
-
-    call print_upstream_flows()
-
-  ! ----------------------------------------------------
-  ! 6) Print and export results
+  ! 5) Print and export results
   ! ----------------------------------------------------
   print *, "--------------------------------------------------------------------------------------------------------------"
   print *, " Element |     P        ET      Qsurf       Li       Qgw      Qin     Surplus " // &
@@ -122,19 +120,19 @@ program nour
      write(*,'(I7,2F14.6)') i, elements%avgalt(i), Qsurf_result(i,1)
   end do
 
-  call export_element_balance("element_balance.csv")
+  call export_element_balance("element_balance.csv")  ! from tools
 
 
   print *, "-----------------------------------------------"
   print *, " Catchment outlet hydrograph (per time step):"
-  do i = 1, n_days
+  do i = 1, n_steps
      print '(A,I3,A,F12.6)', " step ", i, "  Q_out = ", outlet_Q(i)
   end do
     ! Export outlet hydrograph to CSV
   open(newunit=unit, file="outlet_hydrograph.csv", status="replace", action="write")
   write(unit,'(A)') "step,Q_out"
 
-  do i = 1, n_days
+  do i = 1, n_steps
      write(unit,'(I4,",",F12.6)') i, outlet_Q(i)
   end do
 

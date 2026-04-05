@@ -63,14 +63,20 @@ module globals
   real(kind=rkind), dimension(:), allocatable :: meteotime
   
   
-  type, public :: hydrodata_str
-    !> meteorological data
-    real(kind=rkind), dimension(:), allocatable :: precip, G, Tmax, Tmin, Tmean, uz, soilwcontent, RHmax, RHmin
-    !> land cover data
-    real(kind=rkind) :: conduct
-  end type hydrodata_str
   
-  type(hydrodata_str), dimension(:), allocatable :: hydrodata
+  !type, public :: hydrodata_str
+    !> meteorological data
+   
+  ! real(kind=rkind), dimension(:), allocatable :: precip, G, Tmax, Tmin, Tmean, uz, soilwcontent, RHmax, RHmin
+    !> land cover data
+   
+  ! real(kind=rkind) :: conduct
+  
+  
+  !end type hydrodata_str
+  
+  
+  !type(hydrodata_str), dimension(:), allocatable :: hydrodata
   
   
 
@@ -83,10 +89,10 @@ module globals
 
   ! Element-based hydro inputs & outputs (time series)
 
-  ! Element-based hydro inputs & outputs (time series)
-  !real(kind=rkind), allocatable :: precip(:,:), qinter(:,:), qout(:,:)
-  !real(kind=rkind), allocatable :: conduct(:,:), G(:,:), Tmax(:,:), Tmin(:,:), Tmean(:,:)
-  !real(kind=rkind), allocatable :: RHmax(:,:), RHmin(:,:), uz(:,:), soilcontent(:,:)
+  ! Element-based hydrodata_str inputs & outputs (time series)
+  real(kind=rkind), allocatable :: precip(:,:), qinter(:,:), qout(:,:)
+  real(kind=rkind), allocatable :: conduct(:), G(:), Tmax(:,:), Tmin(:,:), Tmean(:,:)
+  real(kind=rkind), allocatable :: RHmax(:,:), RHmin(:,:), uz(:,:), soilcontent(:,:)
 
   real(kind=rkind), allocatable :: Qsurf_result(:,:), ET_flux(:,:), &
                                    L_result(:,:), Qgw_result(:,:), deltas(:,:)

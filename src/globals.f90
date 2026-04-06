@@ -101,6 +101,12 @@ module globals
   integer(kind=ikind), allocatable :: upstream_count(:)
   integer(kind=ikind), allocatable :: upstream_list(:,:)
 
+! store routing values
+  real(kind=rkind), allocatable :: Qin_result(:,:), Qout_result(:,:), &
+                                 Overflow_result(:,:), Storage_result(:,:)
+
+  real(kind=rkind), allocatable :: outlet_Q_m3s(:)
+
 
   ! ---------- Configuration structure (kept from DRUtES style) ----------
   type, public :: configuration

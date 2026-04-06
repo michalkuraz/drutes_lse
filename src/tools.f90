@@ -32,6 +32,18 @@ contains
     allocate(Qgw_result(elements%kolik, n_steps))
     allocate(deltas(elements%kolik, n_steps))
 
+    allocate(Qin_result(elements%kolik, n_steps))
+    allocate(Qout_result(elements%kolik, n_steps))
+    allocate(Overflow_result(elements%kolik, n_steps))
+    allocate(Storage_result(elements%kolik, n_steps))
+    allocate(outlet_Q_m3s(n_steps))
+
+      Qin_result      = 0.0_rkind
+      Qout_result     = 0.0_rkind
+      Overflow_result = 0.0_rkind
+      Storage_result  = 0.0_rkind
+      outlet_Q_m3s    = 0.0_rkind
+
     if (elements%kolik > 0) then
       if (.not. allocated(elements%hydrobal)) then
         allocate(elements%hydrobal(elements%kolik))
@@ -74,15 +86,19 @@ contains
     deltas       = 0.0_rkind
 
     do i = 1, elements%kolik
-      conduct(i) = 0.000005_rkind
+     conduct(i) = 3.0e-6_rkind + 4.0e-8_rkind * elements%avgalt(i)
       G(i)       = 0.0_rkind
     end do
 
     if (n_steps < 10) stop "Need at least 10 time steps for the hardcoded forcing."
 
     do i = 1, elements%kolik
-      precip(i,1:10) = [0.0_rkind, 0.0_rkind, 17.0_rkind, 12.0_rkind, 9.0_rkind, &
-                        7.0_rkind, 40.0_rkind, 0.0_rkind, 0.0_rkind, 3.0_rkind]
+      precip(i,1:10) = [ &
+          0.0_rkind, 0.0_rkind, 17.0_rkind, 12.0_rkind, 9.0_rkind, &
+          7.0_rkind, 40.0_rkind, 0.0_rkind, 0.0_rkind, 3.0_rkind ]
+
+      precip(i,:) = precip(i,:) * (0.90_rkind + 0.0020_rkind * (elements%avgalt(i) - 115.0_rkind))
+
 
       qinter(i,1:10) = [0.0_rkind, 0.0_rkind, 0.015_rkind, 0.018_rkind, 0.02_rkind, &
                         0.022_rkind, 0.025_rkind, 0.0235_rkind, 0.03_rkind, 0.031_rkind]
@@ -105,9 +121,15 @@ contains
       RHmin(i,1:10) = [56.0_rkind, 64.0_rkind, 64.0_rkind, 77.0_rkind, 77.0_rkind, &
                        76.0_rkind, 74.0_rkind, 59.0_rkind, 62.0_rkind, 61.0_rkind]
 
-      soilcontent(i,1:10) = [0.05_rkind, 0.055_rkind, 0.062_rkind, 0.06_rkind, 0.04_rkind, &
-                             0.07_rkind, 0.09_rkind, 0.2_rkind, 0.25_rkind, 0.265_rkind]
+      soilcontent(i,1:10) = [ &
+           0.05_rkind, 0.055_rkind, 0.062_rkind, 0.060_rkind, 0.040_rkind, &
+           0.070_rkind, 0.090_rkind, 0.200_rkind, 0.250_rkind, 0.265_rkind ]
+
+      soilcontent(i,:) = soilcontent(i,:) * (1.10_rkind - 0.0015_rkind * (elements%avgalt(i) - 115.0_rkind))
+      
     end do
+
+  
 
     CN         = 98
     z          = 3.0_rkind
@@ -587,39 +609,52 @@ contains
   !==============================================================
   !   Print upstream flows for diagnostics
   !==============================================================
-  subroutine print_upstream_flows()
-    integer(kind=ikind) :: nel, e, k
-    real(kind=rkind)    :: Qin_from_up
+  subroutine print_upstream_flows(tstep)
+  integer(kind=ikind), intent(in) :: tstep
+  integer(kind=ikind) :: nel, e, k
+  real(kind=rkind)    :: Qin_from_up
 
-    nel = elements%kolik
+  nel = elements%kolik
 
-    if (.not. allocated(elements%hydrobal)) then
-      print *, " No hydrological data (hydrobal not allocated)."
-      return
-    end if
-    if (.not. allocated(upstream_count)) then
-      print *, " Upstream graph not built yet (call init_flow_topology first)."
-      return
-    end if
+  if (.not. allocated(Qin_result)) then
+     print *, " No routed time-series data available."
+     return
+  end if
 
-    print *, "---------------------------------------------------------------"
-    print *, " el | n_up | Qin_from_up    Qin(field)     Qout_elem"
-    print *, "---------------------------------------------------------------"
+  if (.not. allocated(Qout_result)) then
+     print *, " No routed outflow time-series data available."
+     return
+  end if
 
-    do e = 1_ikind, nel
-      Qin_from_up = 0.0_rkind
+  if (.not. allocated(upstream_count)) then
+     print *, " Upstream graph not built yet (call init_flow_topology first)."
+     return
+  end if
 
-      if (allocated(upstream_list)) then
+  if (tstep < 1_ikind .or. tstep > n_steps) then
+     print *, " Invalid time step in print_upstream_flows: ", tstep
+     return
+  end if
+
+  print *, "---------------------------------------------------------------"
+  print *, " Time step = ", tstep
+  print *, " el | n_up | Qin_from_up    Qin(field)     Qout_elem"
+  print *, "---------------------------------------------------------------"
+
+  do e = 1_ikind, nel
+     Qin_from_up = 0.0_rkind
+
+     if (allocated(upstream_list)) then
         do k = 1_ikind, upstream_count(e)
-          Qin_from_up = Qin_from_up + elements%hydrobal(upstream_list(e,k))%outflow
+           Qin_from_up = Qin_from_up + Qout_result(upstream_list(e,k), tstep)
         end do
-      end if
+     end if
 
-      print *, e, upstream_count(e), Qin_from_up, &
-               elements%hydrobal(e)%inflow, elements%hydrobal(e)%outflow
-    end do
-  end subroutine print_upstream_flows
+     print *, e, upstream_count(e), Qin_from_up, &
+              Qin_result(e, tstep), Qout_result(e, tstep)
+  end do
 
+end subroutine print_upstream_flows
 
   !==============================================================
   !   Print graph diagnostics
@@ -690,144 +725,130 @@ contains
   !==============================================================
   !   EXPORT ELEMENT WATER BALANCE TO CSV
   !==============================================================
-  subroutine export_element_balance(filename, tstep)
-    character(len=*), intent(in) :: filename
-    integer(kind=ikind), intent(in) :: tstep
-    integer(kind=ikind) :: i
-    integer :: unit, ios
-    real(kind=rkind) :: surplus, qout_catch
+  subroutine export_element_balance(filename)
+  character(len=*), intent(in) :: filename
+  integer(kind=ikind) :: i, t
+  integer :: unit, ios
 
-    if (.not. allocated(elements%hydrobal)) then
-      print *, "No hydrological data to export."
-      return
-    end if
+  open(newunit=unit, file=filename, status="replace", action="write", iostat=ios)
+  if (ios /= 0) then
+     print *, "Error opening file: ", trim(filename)
+     return
+  end if
 
-    open(newunit=unit, file=filename, status="replace", action="write", iostat=ios)
-    if (ios /= 0) then
-      print *, "Error opening file: ", trim(filename)
-      return
-    end if
+  write(unit,'(A)') "step,element,area,z_avg,downstream," // &
+                    "P,ET,Qsurf,Li,Qgw,Qin,Qout,Overflow,Storage,DeltaS"
 
-    write(unit,'(A)') "Element,Area,z_avg,Downstream," // &
-                      "P,ET,Qsurf,Li,Qgw,Qin,Surplus," // &
-                      "Qout_elem,Qout_catchment,Overflow,DeltaS,Qsurf_local"
+  do t = 1, n_steps
+     do i = 1, elements%kolik
+        write(unit,'(I4, ",", I4, ",", F10.3, ",", F10.3, ",", I4, 10(",",F12.6))') &
+             t, i, elements%area(i), elements%avgalt(i), downstream(i), &
+             precip(i,t), ET_flux(i,t), Qsurf_result(i,t), L_result(i,t), &
+             Qgw_result(i,t), Qin_result(i,t), Qout_result(i,t), &
+             Overflow_result(i,t), Storage_result(i,t), deltas(i,t)
+     end do
+  end do
 
-    do i = 1_ikind, elements%kolik
-      surplus = elements%hydrobal(i)%Qsurf + &
-                elements%hydrobal(i)%Li    + &
-                elements%hydrobal(i)%Qgw
-
-      if (downstream(i) == 0_ikind) then
-        qout_catch = elements%hydrobal(i)%outflow
-      else
-        qout_catch = 0.0_rkind
-      end if
-
-      write(unit,'(I4, ",", F10.3, ",", F10.3, ",", I4, 12(",",F10.3))') &
-           i,                              &
-           elements%area(i),               &
-           elements%avgalt(i),             &
-           downstream(i),                  &
-           precip(i,tstep),                &
-           elements%hydrobal(i)%ET,        &
-           elements%hydrobal(i)%Qsurf,     &
-           elements%hydrobal(i)%Li,        &
-           elements%hydrobal(i)%Qgw,       &
-           elements%hydrobal(i)%inflow,    &
-           surplus,                        &
-           elements%hydrobal(i)%outflow,   &
-           qout_catch,                     &
-           elements%overflow(i),           &
-           elements%hydrobal(i)%deltas,    &
-           Qsurf_result(i,tstep)
-    end do
-
-    close(unit)
-    print *, "Element balances saved to: ", trim(filename)
-  end subroutine export_element_balance
+  close(unit)
+  print *, "Element balances saved to: ", trim(filename)
+end subroutine export_element_balance
 
 
   !==============================================================
   !   Routing
   !==============================================================
   subroutine route_step(tstep)
-    integer(kind=ikind), intent(in) :: tstep
+  integer(kind=ikind), intent(in) :: tstep
 
-    integer(kind=ikind) :: el, i, dwn
-    real(kind=rkind)    :: old_storage, local_input, local_losses, surplus
-    real(kind=rkind), allocatable :: overflow_total(:), storage_new(:)
+  integer(kind=ikind) :: el, i, dwn
+  real(kind=rkind)    :: old_storage, local_input, local_losses, surplus
+  real(kind=rkind)    :: area_total_m2, volume_m3
+  real(kind=rkind), allocatable :: overflow_total(:), storage_new(:)
 
-    allocate(overflow_total(elements%kolik))
-    allocate(storage_new(elements%kolik))
+  allocate(overflow_total(elements%kolik))
+  allocate(storage_new(elements%kolik))
 
-    elements%hydrobal(:)%inflow  = 0.0_rkind
-    elements%hydrobal(:)%outflow = 0.0_rkind
+  elements%hydrobal(:)%inflow  = 0.0_rkind
+  elements%hydrobal(:)%outflow = 0.0_rkind
 
-    overflow_total = 0.0_rkind
-    storage_new    = storage
+  overflow_total = 0.0_rkind
+  storage_new    = storage
 
-    do el = 1_ikind, elements%kolik
-      old_storage = storage(el)
+  do el = 1_ikind, elements%kolik
+     old_storage = storage(el)
 
-      local_input = precip(el,tstep) + qinter(el,tstep) + old_storage
+     local_input = precip(el,tstep) + qinter(el,tstep) + old_storage
 
-      local_losses = elements%hydrobal(el)%ET + &
-                     elements%hydrobal(el)%Li + &
-                     elements%hydrobal(el)%Qgw
+     local_losses = elements%hydrobal(el)%ET + &
+                    elements%hydrobal(el)%Li + &
+                    elements%hydrobal(el)%Qgw
 
-      if (local_losses >= local_input) then
+     if (local_losses >= local_input) then
         storage_new(el) = 0.0_rkind
         surplus         = 0.0_rkind
-      else
+     else
         surplus = local_input - local_losses
 
         if (surplus <= capacity(el)) then
-          storage_new(el) = surplus
-          surplus         = 0.0_rkind
+           storage_new(el) = surplus
+           surplus         = 0.0_rkind
         else
-          storage_new(el) = capacity(el)
-          surplus         = surplus - capacity(el)
+           storage_new(el) = capacity(el)
+           surplus         = surplus - capacity(el)
         end if
-      end if
+     end if
 
-      overflow_total(el) = surplus
-    end do
+     overflow_total(el) = surplus
+  end do
 
-    outlet_Q(tstep) = 0.0_rkind
+  outlet_Q(tstep) = 0.0_rkind
 
-    do i = 1_ikind, elements%kolik
-      el  = flow_order(i)
-      dwn = downstream(el)
+  do i = 1_ikind, elements%kolik
+     el  = flow_order(i)
+     dwn = downstream(el)
 
-      elements%hydrobal(el)%outflow = elements%hydrobal(el)%inflow + overflow_total(el)
+     elements%hydrobal(el)%outflow = elements%hydrobal(el)%inflow + overflow_total(el)
 
-      if (dwn > 0_ikind) then
+     if (dwn > 0_ikind) then
         elements%hydrobal(dwn)%inflow = elements%hydrobal(dwn)%inflow + &
                                         elements%hydrobal(el)%outflow
-      else
+     else
         outlet_Q(tstep) = outlet_Q(tstep) + elements%hydrobal(el)%outflow
-      end if
-    end do
+     end if
+  end do
 
-    do el = 1_ikind, elements%kolik
-      old_storage           = storage(el)
-      storage(el)           = storage_new(el)
-      elements%overflow(el) = overflow_total(el)
+  do el = 1_ikind, elements%kolik
+     old_storage           = storage(el)
+     storage(el)           = storage_new(el)
+     elements%overflow(el) = overflow_total(el)
 
-      elements%hydrobal(el)%deltas = precip(el,tstep) + &
-                                     qinter(el,tstep) + &
-                                     old_storage + &
-                                     elements%hydrobal(el)%inflow - &
-                                     ( elements%hydrobal(el)%ET      + &
-                                       elements%hydrobal(el)%Li      + &
-                                       elements%hydrobal(el)%Qgw     + &
-                                       storage(el)                   + &
-                                       elements%hydrobal(el)%outflow )
+     elements%hydrobal(el)%deltas = precip(el,tstep) + &
+                                    qinter(el,tstep) + &
+                                    old_storage + &
+                                    elements%hydrobal(el)%inflow - &
+                                    ( elements%hydrobal(el)%ET      + &
+                                      elements%hydrobal(el)%Li      + &
+                                      elements%hydrobal(el)%Qgw     + &
+                                      storage(el)                   + &
+                                      elements%hydrobal(el)%outflow )
 
-      deltas(el,tstep) = elements%hydrobal(el)%deltas
-    end do
+     deltas(el,tstep)          = elements%hydrobal(el)%deltas
+     Qin_result(el,tstep)      = elements%hydrobal(el)%inflow
+     Qout_result(el,tstep)     = elements%hydrobal(el)%outflow
+     Overflow_result(el,tstep) = elements%overflow(el)
+     Storage_result(el,tstep)  = storage(el)
+  end do
 
-    deallocate(overflow_total, storage_new)
-  end subroutine route_step
+  ! Convert catchment outlet from mm over catchment per step to m3/s
+  area_total_m2 = sum(elements%area)
+  volume_m3 = outlet_Q(tstep) / 1000.0_rkind * area_total_m2
 
+  if (dt_days > 0.0_rkind) then
+     outlet_Q_m3s(tstep) = volume_m3 / (dt_days * 86400.0_rkind)
+  else
+     outlet_Q_m3s(tstep) = 0.0_rkind
+  end if
+
+  deallocate(overflow_total, storage_new)
+end subroutine route_step
 end module tools

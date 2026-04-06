@@ -1,112 +1,114 @@
 module tools
   use typy
   use globals
-   implicit none
+  implicit none
 contains
 
-subroutine init_hydro()
+  ! -----------------------------------------------------
+  ! initialize and allocate
+  ! -----------------------------------------------------
+  subroutine init_hydro()
     integer(kind=ikind) :: i
 
+    allocate(precip(elements%kolik, n_steps))
+    allocate(qinter(elements%kolik, n_steps))
+    allocate(qout(elements%kolik, n_steps))
 
-    ! Allocate hydrological arrays
-    ! Hydrological forcing and result arrays
-    allocate( precip(elements%kolik, n_steps) )
-    allocate( qinter(elements%kolik, n_steps) )
-    allocate( qout(elements%kolik, n_steps) )
+    allocate(conduct(elements%kolik))
+    allocate(G(elements%kolik))
 
-    allocate( conduct(elements%kolik) )
-    allocate( G(elements%kolik) )
+    allocate(Tmax(elements%kolik, n_steps))
+    allocate(Tmin(elements%kolik, n_steps))
+    allocate(Tmean(elements%kolik, n_steps))
+    allocate(RHmax(elements%kolik, n_steps))
+    allocate(RHmin(elements%kolik, n_steps))
 
-    allocate( Tmax(elements%kolik, n_steps) )
-    allocate( Tmin(elements%kolik, n_steps) )
-    allocate( Tmean(elements%kolik, n_steps) )
-    allocate( RHmax(elements%kolik, n_steps) )
-    allocate( RHmin(elements%kolik, n_steps) )
+    allocate(uz(elements%kolik, n_steps))
+    allocate(soilcontent(elements%kolik, n_steps))
 
-    allocate( uz(elements%kolik, n_steps) )
-    allocate( soilcontent(elements%kolik, n_steps) )
+    allocate(Qsurf_result(elements%kolik, n_steps))
+    allocate(ET_flux(elements%kolik, n_steps))
+    allocate(L_result(elements%kolik, n_steps))
+    allocate(Qgw_result(elements%kolik, n_steps))
+    allocate(deltas(elements%kolik, n_steps))
 
-    ! Model outputs
-    allocate( Qsurf_result(elements%kolik, n_steps) )
-    allocate( ET_flux(elements%kolik, n_steps) )
-    allocate( L_result(elements%kolik, n_steps) )
-    allocate( Qgw_result(elements%kolik, n_steps) )
-    allocate( deltas(elements%kolik, n_steps) )
-
-
-    ! Allocate & initialize hydrobal structure
     if (elements%kolik > 0) then
-       if (.not. allocated(elements%hydrobal)) then
-          allocate(elements%hydrobal(elements%kolik))
-       end if
-       do i = 1, elements%kolik
-          elements%hydrobal(i)%inflow  = 0.0_rkind
-          elements%hydrobal(i)%outflow = 0.0_rkind
-          elements%hydrobal(i)%Li      = 0.0_rkind
-          elements%hydrobal(i)%ET      = 0.0_rkind
-          elements%hydrobal(i)%Qgw     = 0.0_rkind
-          elements%hydrobal(i)%Qsurf   = 0.0_rkind
-          elements%hydrobal(i)%deltas  = 0.0_rkind
-       end do
+      if (.not. allocated(elements%hydrobal)) then
+        allocate(elements%hydrobal(elements%kolik))
+      end if
+      do i = 1, elements%kolik
+        elements%hydrobal(i)%inflow  = 0.0_rkind
+        elements%hydrobal(i)%outflow = 0.0_rkind
+        elements%hydrobal(i)%Li      = 0.0_rkind
+        elements%hydrobal(i)%ET      = 0.0_rkind
+        elements%hydrobal(i)%Qgw     = 0.0_rkind
+        elements%hydrobal(i)%Qsurf   = 0.0_rkind
+        elements%hydrobal(i)%deltas  = 0.0_rkind
+        elements%hydrobal(i)%storage = 0.0_rkind
+      end do
     end if
 
-    ! Storage / routing arrays
     if (.not. allocated(storage))  allocate(storage(elements%kolik))
     if (.not. allocated(capacity)) allocate(capacity(elements%kolik))
     if (.not. allocated(outlet_Q)) allocate(outlet_Q(n_steps))
 
-    storage  = 0.0_rkind
-    outlet_Q = 0.0_rkind
-    
+    storage      = 0.0_rkind
+    outlet_Q     = 0.0_rkind
+    capacity     = 5.0_rkind
 
-    ! Simple default capacity [mm]
-    capacity = 5.0_rkind
+    precip      = 0.0_rkind
+    qinter      = 0.0_rkind
+    qout        = 0.0_rkind
+    uz          = 0.0_rkind
+    Tmax        = 0.0_rkind
+    Tmin        = 0.0_rkind
+    Tmean       = 0.0_rkind
+    RHmax       = 0.0_rkind
+    RHmin       = 0.0_rkind
+    soilcontent = 0.0_rkind
 
-    ! Example meteorological inputs (same structure as before)
-   precip = 0.0_rkind
-   qinter = 0.0_rkind
-   uz = 0.0_rkind
-   Tmax = 0.0_rkind
-   Tmin = 0.0_rkind
-   Tmean = 0.0_rkind
-   RHmax = 0.0_rkind
-   RHmin = 0.0_rkind
-   soilcontent = 0.0_rkind
+    Qsurf_result = 0.0_rkind
+    ET_flux      = 0.0_rkind
+    L_result     = 0.0_rkind
+    Qgw_result   = 0.0_rkind
+    deltas       = 0.0_rkind
 
-  do i = 1, elements%kolik
-   conduct(i) = 0.000005_rkind
-   G(i)       = 0.0_rkind
- end do
+    do i = 1, elements%kolik
+      conduct(i) = 0.000005_rkind
+      G(i)       = 0.0_rkind
+    end do
 
-do i = 1, elements%kolik
-   precip(i,1:n_steps) = [0.0_rkind, 0.0_rkind, 17.0_rkind, 12.0_rkind, 9.0_rkind, &
-                     7.0_rkind, 40.0_rkind, 0.0_rkind, 0.0_rkind, 3.0_rkind]
+    if (n_steps < 10) stop "Need at least 10 time steps for the hardcoded forcing."
 
-   qinter(i,1:n_steps) = [0.0_rkind, 0.0_rkind, 0.015_rkind, 0.018_rkind, 0.02_rkind, &
-                     0.022_rkind, 0.025_rkind, 0.0235_rkind, 0.03_rkind, 0.031_rkind]
+    do i = 1, elements%kolik
+      precip(i,1:10) = [0.0_rkind, 0.0_rkind, 17.0_rkind, 12.0_rkind, 9.0_rkind, &
+                        7.0_rkind, 40.0_rkind, 0.0_rkind, 0.0_rkind, 3.0_rkind]
 
-   uz(i,1:n_steps) = [4.38_rkind, 3.57_rkind, 4.026_rkind, 3.097_rkind, 4.14_rkind, &
-                 3.13_rkind, 3.92_rkind, 3.19_rkind, 3.98_rkind, 3.34_rkind]
+      qinter(i,1:10) = [0.0_rkind, 0.0_rkind, 0.015_rkind, 0.018_rkind, 0.02_rkind, &
+                        0.022_rkind, 0.025_rkind, 0.0235_rkind, 0.03_rkind, 0.031_rkind]
 
-   Tmax(i,1:n_steps) = [19.1_rkind, 15.3_rkind, 12.8_rkind, 11.8_rkind, 10.5_rkind, &
-                   15.2_rkind, 11.6_rkind, 14.6_rkind, 17.2_rkind, 16.4_rkind]
+      uz(i,1:10) = [4.38_rkind, 3.57_rkind, 4.026_rkind, 3.097_rkind, 4.14_rkind, &
+                    3.13_rkind, 3.92_rkind, 3.19_rkind, 3.98_rkind, 3.34_rkind]
 
-   Tmin(i,1:n_steps) = [5.4_rkind, 6.8_rkind, 8.8_rkind, 7.6_rkind, 8.4_rkind, &
-                   8.3_rkind, 8.8_rkind, 6.2_rkind, 4.8_rkind, 6.2_rkind]
+      Tmax(i,1:10) = [19.1_rkind, 15.3_rkind, 12.8_rkind, 11.8_rkind, 10.5_rkind, &
+                      15.2_rkind, 11.6_rkind, 14.6_rkind, 17.2_rkind, 16.4_rkind]
 
-   Tmean(i,1:n_steps) = [12.25_rkind, 11.05_rkind, 10.8_rkind, 9.7_rkind, 9.45_rkind, &
-                    11.75_rkind, 10.2_rkind, 10.4_rkind, 11.0_rkind, 9.7_rkind]
+      Tmin(i,1:10) = [5.4_rkind, 6.8_rkind, 8.8_rkind, 7.6_rkind, 8.4_rkind, &
+                      8.3_rkind, 8.8_rkind, 6.2_rkind, 4.8_rkind, 6.2_rkind]
 
-   RHmax(i,1:n_steps) = [84.0_rkind, 85.0_rkind, 76.0_rkind, 87.0_rkind, 92.0_rkind, &
-                    94.0_rkind, 97.0_rkind, 92.0_rkind, 93.0_rkind, 97.0_rkind]
+      Tmean(i,1:10) = [12.25_rkind, 11.05_rkind, 10.8_rkind, 9.7_rkind, 9.45_rkind, &
+                       11.75_rkind, 10.2_rkind, 10.4_rkind, 11.0_rkind, 9.7_rkind]
 
-   RHmin(i,1:n_steps) = [56.0_rkind, 64.0_rkind, 64.0_rkind, 77.0_rkind, 77.0_rkind, &
-                    76.0_rkind, 74.0_rkind, 59.0_rkind, 62.0_rkind, 61.0_rkind]
+      RHmax(i,1:10) = [84.0_rkind, 85.0_rkind, 76.0_rkind, 87.0_rkind, 92.0_rkind, &
+                       94.0_rkind, 97.0_rkind, 92.0_rkind, 93.0_rkind, 97.0_rkind]
 
-   soilcontent(i,1:n_steps) = [0.05_rkind, 0.055_rkind, 0.062_rkind, 0.06_rkind, 0.04_rkind, &
-                          0.07_rkind, 0.09_rkind, 0.2_rkind, 0.25_rkind, 0.265_rkind]
-end do
-    ! Constants
+      RHmin(i,1:10) = [56.0_rkind, 64.0_rkind, 64.0_rkind, 77.0_rkind, 77.0_rkind, &
+                       76.0_rkind, 74.0_rkind, 59.0_rkind, 62.0_rkind, 61.0_rkind]
+
+      soilcontent(i,1:10) = [0.05_rkind, 0.055_rkind, 0.062_rkind, 0.06_rkind, 0.04_rkind, &
+                             0.07_rkind, 0.09_rkind, 0.2_rkind, 0.25_rkind, 0.265_rkind]
+    end do
+
     CN         = 98
     z          = 3.0_rkind
     Julian_day = 172
@@ -117,58 +119,49 @@ end do
     sigma      = 4.903e-5_rkind
     gsc        = 0.0820_rkind
     ccrop      = 0.8_rkind
-
   end subroutine init_hydro
+
 
   ! -----------------------------------------------------
   ! Find neighbours: elements that share an edge
   ! -----------------------------------------------------
   subroutine find_neighbours(elems, nodes_loc)
     type(elements_str), intent(inout) :: elems
-    type(nodes_str),    intent(in)    :: nodes_loc   ! not used now, but fine
+    type(nodes_str),    intent(in)    :: nodes_loc
 
     integer(kind=ikind) :: nel
     integer(kind=ikind) :: i, j, k, shared
     integer(kind=ikind) :: e1(3), e2(3)
 
-    ! Number of elements in the mesh
     nel = elems%kolik
     if (nel <= 0_ikind) return
 
-    ! Allocate neighbour table if needed: each triangle can have up to 3 neighbours
     if (.not. allocated(elems%neighbours)) then
-       allocate(elems%neighbours(nel,3))
+      allocate(elems%neighbours(nel,3))
     end if
-    elems%neighbours = 0_ikind   ! 0 = no neighbour
+    elems%neighbours = 0_ikind
 
-    ! Double loop over all element pairs (i, j)
     do i = 1_ikind, nel
-       e1 = elems%data(i,:)          ! nodes of element i
+      e1 = elems%data(i,:)
+      do j = 1_ikind, nel
+        if (i == j) cycle
+        e2 = elems%data(j,:)
 
-       do j = 1_ikind, nel
-          if (i == j) cycle          ! skip self
-          e2 = elems%data(j,:)       ! nodes of element j
+        shared = 0_ikind
+        do k = 1_ikind, 3_ikind
+          if (any(e2 == e1(k))) shared = shared + 1_ikind
+        end do
 
-          ! Count how many nodes are shared between element i and j
-          shared = 0_ikind
+        if (shared >= 2_ikind) then
           do k = 1_ikind, 3_ikind
-             if (any(e2 == e1(k))) shared = shared + 1_ikind
+            if (elems%neighbours(i,k) == 0_ikind) then
+              elems%neighbours(i,k) = j
+              exit
+            end if
           end do
-
-          ! If they share at least 2 nodes, they share an edge => neighbours
-          if (shared >= 2_ikind) then
-             ! Put j into the next free neighbour slot of element i
-             do k = 1_ikind, 3_ikind
-                if (elems%neighbours(i,k) == 0_ikind) then
-                   elems%neighbours(i,k) = j
-                   exit
-                end if
-             end do
-          end if
-
-       end do
+        end if
+      end do
     end do
-
   end subroutine find_neighbours
 
 
@@ -178,16 +171,17 @@ end do
     integer(kind=ikind) :: i
 
     avgval = 0.0_rkind
-    do i = 1, ubound(r,1)
-      avgval = avgval / real(size(r), kind=rkind)
+    do i = 1, size(r)
+      avgval = avgval + r(i)
     end do
-
+    avgval = avgval / real(size(r), kind=rkind)
   end function avg
 
-!==============================================================
-!   READ MESH (nodes + elements)
-!==============================================================
-subroutine read_mesh(filename)  
+
+  !==============================================================
+  !   READ MESH (nodes + elements)
+  !==============================================================
+  subroutine read_mesh(filename)
     character(len=*), intent(in) :: filename
     integer :: fileid, ios, n_nodes, n_elem
     integer :: id, n1, n2, n3, i
@@ -197,17 +191,17 @@ subroutine read_mesh(filename)
 
     inquire(file=filename, exist=file_exists)
     if (.not. file_exists) then
-       print *, " Error: File ", trim(filename), " not found."
-       stop
+      print *, " Error: File ", trim(filename), " not found."
+      stop
     end if
 
     open(newunit=fileid, file=filename, status="old", action="read", iostat=ios)
     if (ios /= 0) stop " Could not open mesh file."
 
     do
-       read(fileid,*,iostat=ios) line
-       if (ios < 0) stop "Unexpected EOF before node count"
-       if (len_trim(line) > 0 .and. line(1:1) /= "#") exit
+      read(fileid,*,iostat=ios) line
+      if (ios < 0) stop "Unexpected EOF before node count"
+      if (len_trim(line) > 0 .and. line(1:1) /= "#") exit
     end do
     read(line,*) n_nodes
     nodes%kolik = n_nodes
@@ -217,21 +211,21 @@ subroutine read_mesh(filename)
 
     i = 0
     do while (i < n_nodes)
-       read(fileid,'(A)',iostat=ios) line
-       if (ios < 0) exit
-       if (len_trim(line) == 0 .or. line(1:1) == "#") cycle
-       read(line,*) id, x, y, zloc
-       i = i + 1
-       nodes%data(i,1)   = x
-       nodes%data(i,2)   = y
-       nodes%altitude(i) = zloc
+      read(fileid,'(A)',iostat=ios) line
+      if (ios < 0) exit
+      if (len_trim(line) == 0 .or. line(1:1) == "#") cycle
+      read(line,*) id, x, y, zloc
+      i = i + 1
+      nodes%data(i,1)   = x
+      nodes%data(i,2)   = y
+      nodes%altitude(i) = zloc
     end do
     print *, " Read", i, "nodes."
 
     do
-       read(fileid,'(A)',iostat=ios) line
-       if (ios < 0) stop "Unexpected EOF before element count"
-       if (len_trim(line) > 0 .and. line(1:1) /= "#") exit
+      read(fileid,'(A)',iostat=ios) line
+      if (ios < 0) stop "Unexpected EOF before element count"
+      if (len_trim(line) > 0 .and. line(1:1) /= "#") exit
     end do
     read(line,*) n_elem
     elements%kolik = n_elem
@@ -247,27 +241,27 @@ subroutine read_mesh(filename)
 
     i = 0
     do while (i < n_elem)
-       read(fileid,'(A)',iostat=ios) line
-       if (ios < 0) exit
-       if (len_trim(line) == 0 .or. line(1:1) == "#") cycle
-       read(line,*) id, n1, n2, n3
-       i = i + 1
-       elements%data(i,:)   = [n1, n2, n3]
-       elements%material(i) = 1_ikind
+      read(fileid,'(A)',iostat=ios) line
+      if (ios < 0) exit
+      if (len_trim(line) == 0 .or. line(1:1) == "#") cycle
+      read(line,*) id, n1, n2, n3
+      i = i + 1
+      elements%data(i,:)   = [n1, n2, n3]
+      elements%material(i) = 1_ikind
     end do
     print *, " Read", i, "triangular elements."
     close(fileid)
 
     if (.not. allocated(elements%hydrobal)) then
-       allocate(elements%hydrobal(n_elem))
+      allocate(elements%hydrobal(n_elem))
     end if
-    
   end subroutine read_mesh
 
-!==============================================================
-!   COMPUTE ELEMENT AREAS
-!==============================================================
-subroutine compute_areas()
+
+  !==============================================================
+  !   COMPUTE ELEMENT AREAS
+  !==============================================================
+  subroutine compute_areas()
     integer(kind=ikind) :: i
     integer(kind=ikind) :: n1, n2, n3
     real(kind=rkind) :: a(2), b(2), c(2)
@@ -276,14 +270,14 @@ subroutine compute_areas()
     total_area = 0.0_rkind
 
     do i = 1_ikind, elements%kolik
-       n1 = elements%data(i,1)
-       n2 = elements%data(i,2)
-       n3 = elements%data(i,3)
-       a  = nodes%data(n1,:)
-       b  = nodes%data(n2,:)
-       c  = nodes%data(n3,:)
-       elements%area(i) = area_triangle(a,b,c)
-       total_area       = total_area + elements%area(i)
+      n1 = elements%data(i,1)
+      n2 = elements%data(i,2)
+      n3 = elements%data(i,3)
+      a  = nodes%data(n1,:)
+      b  = nodes%data(n2,:)
+      c  = nodes%data(n3,:)
+      elements%area(i) = area_triangle(a,b,c)
+      total_area       = total_area + elements%area(i)
     end do
 
     print *, " Total mesh area = ", total_area
@@ -296,36 +290,38 @@ subroutine compute_areas()
     area = 0.5_rkind * abs(a(1)*(b(2)-c(2)) + b(1)*(c(2)-a(2)) + c(1)*(a(2)-b(2)))
   end function area_triangle
 
-!==============================================================
-!   COMPUTE average altitude per element
-!==============================================================
+
+  !==============================================================
+  !   COMPUTE average altitude per element
+  !==============================================================
   subroutine compute_avgalt()
     integer(kind=ikind) :: i, n1, n2, n3
     real(kind=rkind) :: z1, z2, z3
 
     do i = 1_ikind, elements%kolik
-       n1 = elements%data(i,1)
-       n2 = elements%data(i,2)
-       n3 = elements%data(i,3)
+      n1 = elements%data(i,1)
+      n2 = elements%data(i,2)
+      n3 = elements%data(i,3)
 
-       if (allocated(nodes%altitude)) then
-          z1 = nodes%altitude(n1)
-          z2 = nodes%altitude(n2)
-          z3 = nodes%altitude(n3)
-       else
-          z1 = nodes%data(n1,2)
-          z2 = nodes%data(n2,2)
-          z3 = nodes%data(n3,2)
-       end if
+      if (allocated(nodes%altitude)) then
+        z1 = nodes%altitude(n1)
+        z2 = nodes%altitude(n2)
+        z3 = nodes%altitude(n3)
+      else
+        z1 = nodes%data(n1,2)
+        z2 = nodes%data(n2,2)
+        z3 = nodes%data(n3,2)
+      end if
 
-       elements%avgalt(i) = (z1 + z2 + z3) / 3.0_rkind
+      elements%avgalt(i) = (z1 + z2 + z3) / 3.0_rkind
     end do
   end subroutine compute_avgalt
 
-!==============================================================
-!   FLOW TOPOLOGY INITIALIZATION
-!==============================================================
-subroutine init_flow_topology()
+
+  !==============================================================
+  !   FLOW TOPOLOGY INITIALIZATION
+  !==============================================================
+  subroutine init_flow_topology()
     integer(kind=ikind) :: nel, i
 
     nel = elements%kolik
@@ -333,30 +329,30 @@ subroutine init_flow_topology()
 
     call find_neighbours(elements, nodes)
 
-    if (.not. allocated(downstream))  allocate(downstream(nel))
-    if (.not. allocated(flow_order))  allocate(flow_order(nel))
+    if (.not. allocated(downstream)) allocate(downstream(nel))
+    if (.not. allocated(flow_order)) allocate(flow_order(nel))
 
     if (.not. allocated(elements%outlet))      allocate(elements%outlet(nel))
     if (.not. allocated(elements%watershed))   allocate(elements%watershed(nel))
     if (.not. allocated(elements%ndwatershed)) allocate(elements%ndwatershed(nel,2))
     if (.not. allocated(elements%ndoutlet))    allocate(elements%ndoutlet(nel,2))
 
-    downstream          = 0_ikind
-    flow_order          = 0_ikind
-    elements%overflow   = 0.0_rkind
-    elements%outlet     = .false.
-    elements%watershed  = .false.
+    downstream           = 0_ikind
+    flow_order           = 0_ikind
+    elements%overflow    = 0.0_rkind
+    elements%outlet      = .false.
+    elements%watershed   = .false.
     elements%ndwatershed = 0_ikind
     elements%ndoutlet    = 0_ikind
 
     do i = 1, nel
-       elements%downstream(i)%els    = 0_ikind
-       elements%downstream(i)%slopes = 0.0_rkind
-       elements%downstream(i)%widths = 0.0_rkind
+      elements%downstream(i)%els    = 0_ikind
+      elements%downstream(i)%slopes = 0.0_rkind
+      elements%downstream(i)%widths = 0.0_rkind
 
-       elements%upstream(i)%els      = 0_ikind
-       elements%upstream(i)%slopes   = 0.0_rkind
-       elements%upstream(i)%widths   = 0.0_rkind
+      elements%upstream(i)%els      = 0_ikind
+      elements%upstream(i)%slopes   = 0.0_rkind
+      elements%upstream(i)%widths   = 0.0_rkind
     end do
 
     call build_downstream_graph()
@@ -365,9 +361,10 @@ subroutine init_flow_topology()
     call build_upstream_graph()
   end subroutine init_flow_topology
 
-!==============================================================
-!   built downstream graph based on lowest neighbour
-!==============================================================
+
+  !==============================================================
+  !   built downstream graph based on lowest neighbour
+  !==============================================================
   subroutine build_downstream_graph()
     integer(kind=ikind) :: i, j, nb, nel
     real(kind=rkind)    :: myz, bestz
@@ -376,22 +373,22 @@ subroutine init_flow_topology()
     nel = elements%kolik
 
     do i = 1, nel
-       myz     = elements%avgalt(i)
-       bestz   = myz
-       best_nb = 0_ikind
+      myz     = elements%avgalt(i)
+      bestz   = myz
+      best_nb = 0_ikind
 
-       do j = 1, ubound(elements%neighbours,2)
-          nb = elements%neighbours(i,j)
-          if (nb > 0_ikind) then
-             if (elements%avgalt(nb) < bestz) then
-                bestz   = elements%avgalt(nb)
-                best_nb = nb
-             end if
+      do j = 1, ubound(elements%neighbours,2)
+        nb = elements%neighbours(i,j)
+        if (nb > 0_ikind) then
+          if (elements%avgalt(nb) < bestz) then
+            bestz   = elements%avgalt(nb)
+            best_nb = nb
           end if
-       end do
+        end if
+      end do
 
-       downstream(i) = best_nb
-       elements%outlet(i) = (best_nb == 0_ikind)
+      downstream(i)      = best_nb
+      elements%outlet(i) = (best_nb == 0_ikind)
     end do
   end subroutine build_downstream_graph
 
@@ -399,11 +396,10 @@ subroutine init_flow_topology()
   function setlines(el, nd) result(pts)
     integer(kind=ikind), intent(in) :: el, nd
     integer(kind=ikind), dimension(2) :: pts
-
     integer(kind=ikind), dimension(3) :: neighnds, elnds
     integer(kind=ikind) :: pos, i, j
 
-    elnds   = elements%data(el,:)
+    elnds    = elements%data(el,:)
     neighnds = elements%data(nd,:)
 
     pts = 0_ikind
@@ -454,13 +450,13 @@ subroutine init_flow_topology()
   function dist(A,B) result(l)
     real(kind=rkind), dimension(:), intent(in) :: A,B
     real(kind=rkind) :: l
-
     l = sqrt((A(1)-B(1))*(A(1)-B(1)) + (A(2)-B(2))*(A(2)-B(2)))
   end function dist
 
-!==============================================================
-!   build graph
-!==============================================================
+
+  !==============================================================
+  !   build graph
+  !==============================================================
   subroutine build_graph()
     integer(kind=ikind) :: el, i
     integer(kind=ikind), dimension(3) :: ngh
@@ -470,13 +466,13 @@ subroutine init_flow_topology()
     integer(kind=ikind), dimension(3,2) :: nghlines
 
     do el = 1, elements%kolik
-       elements%downstream(el)%els    = 0_ikind
-       elements%downstream(el)%slopes = 0.0_rkind
-       elements%downstream(el)%widths = 0.0_rkind
+      elements%downstream(el)%els    = 0_ikind
+      elements%downstream(el)%slopes = 0.0_rkind
+      elements%downstream(el)%widths = 0.0_rkind
 
-       elements%upstream(el)%els      = 0_ikind
-       elements%upstream(el)%slopes   = 0.0_rkind
-       elements%upstream(el)%widths   = 0.0_rkind
+      elements%upstream(el)%els      = 0_ikind
+      elements%upstream(el)%slopes   = 0.0_rkind
+      elements%upstream(el)%widths   = 0.0_rkind
     end do
 
     do el = 1, elements%kolik
@@ -513,12 +509,12 @@ subroutine init_flow_topology()
         end if
       end do
     end do
-    
   end subroutine build_graph
 
- !==============================================================
-!   Build flow order based on elevation (highest first)
-!==============================================================
+
+  !==============================================================
+  !   Build flow order based on elevation (highest first)
+  !==============================================================
   subroutine build_flow_order()
     integer(kind=ikind) :: nel, i, j, tmp_idx
     real(kind=rkind)    :: tmp_z
@@ -529,26 +525,27 @@ subroutine init_flow_topology()
     allocate(idx(nel), z(nel))
 
     do i = 1_ikind, nel
-       idx(i) = i
-       z(i)   = elements%avgalt(i)
+      idx(i) = i
+      z(i)   = elements%avgalt(i)
     end do
 
     do i = 1_ikind, nel-1
-       do j = i+1_ikind, nel
-          if (z(j) > z(i)) then
-             tmp_z   = z(i);   z(i)   = z(j);   z(j)   = tmp_z
-             tmp_idx = idx(i); idx(i) = idx(j); idx(j) = tmp_idx
-          end if
-       end do
+      do j = i+1_ikind, nel
+        if (z(j) > z(i)) then
+          tmp_z   = z(i);   z(i)   = z(j);   z(j)   = tmp_z
+          tmp_idx = idx(i); idx(i) = idx(j); idx(j) = tmp_idx
+        end if
+      end do
     end do
 
     flow_order = idx
     deallocate(idx, z)
   end subroutine build_flow_order
 
-!==============================================================
-!   Build upstream graph
-!==============================================================
+
+  !==============================================================
+  !   Build upstream graph
+  !==============================================================
   subroutine build_upstream_graph()
     integer(kind=ikind) :: nel, i, j, max_up
 
@@ -560,37 +557,36 @@ subroutine init_flow_topology()
     upstream_count = 0_ikind
 
     do i = 1_ikind, nel
-       j = downstream(i)
-       if (j > 0_ikind) then
-          upstream_count(j) = upstream_count(j) + 1_ikind
-       end if
+      j = downstream(i)
+      if (j > 0_ikind) upstream_count(j) = upstream_count(j) + 1_ikind
     end do
 
     max_up = 0_ikind
     do i = 1_ikind, nel
-       if (upstream_count(i) > max_up) max_up = upstream_count(i)
+      if (upstream_count(i) > max_up) max_up = upstream_count(i)
     end do
 
     if (allocated(upstream_list)) deallocate(upstream_list)
 
     if (max_up > 0_ikind) then
-       allocate(upstream_list(nel, max_up))
-       upstream_list = 0_ikind
-       upstream_count = 0_ikind
+      allocate(upstream_list(nel, max_up))
+      upstream_list  = 0_ikind
+      upstream_count = 0_ikind
 
-       do i = 1_ikind, nel
-          j = downstream(i)
-          if (j > 0_ikind) then
-             upstream_count(j) = upstream_count(j) + 1_ikind
-             upstream_list(j, upstream_count(j)) = i
-          end if
-       end do
+      do i = 1_ikind, nel
+        j = downstream(i)
+        if (j > 0_ikind) then
+          upstream_count(j) = upstream_count(j) + 1_ikind
+          upstream_list(j, upstream_count(j)) = i
+        end if
+      end do
     end if
   end subroutine build_upstream_graph
 
-!==============================================================
-!   Print upstream flows for diagnostics
-!==============================================================
+
+  !==============================================================
+  !   Print upstream flows for diagnostics
+  !==============================================================
   subroutine print_upstream_flows()
     integer(kind=ikind) :: nel, e, k
     real(kind=rkind)    :: Qin_from_up
@@ -598,12 +594,12 @@ subroutine init_flow_topology()
     nel = elements%kolik
 
     if (.not. allocated(elements%hydrobal)) then
-       print *, " No hydrological data (hydrobal not allocated)."
-       return
+      print *, " No hydrological data (hydrobal not allocated)."
+      return
     end if
     if (.not. allocated(upstream_count)) then
-       print *, " Upstream graph not built yet (call init_flow_topology first)."
-       return
+      print *, " Upstream graph not built yet (call init_flow_topology first)."
+      return
     end if
 
     print *, "---------------------------------------------------------------"
@@ -611,24 +607,24 @@ subroutine init_flow_topology()
     print *, "---------------------------------------------------------------"
 
     do e = 1_ikind, nel
-       Qin_from_up = 0.0_rkind
+      Qin_from_up = 0.0_rkind
 
-       if (allocated(upstream_list)) then
-          do k = 1_ikind, upstream_count(e)
-             Qin_from_up = Qin_from_up + elements%hydrobal(upstream_list(e,k))%outflow
-          end do
-       end if
+      if (allocated(upstream_list)) then
+        do k = 1_ikind, upstream_count(e)
+          Qin_from_up = Qin_from_up + elements%hydrobal(upstream_list(e,k))%outflow
+        end do
+      end if
 
-       print *, e, upstream_count(e), Qin_from_up, &
-            elements%hydrobal(e)%inflow, elements%hydrobal(e)%outflow
+      print *, e, upstream_count(e), Qin_from_up, &
+               elements%hydrobal(e)%inflow, elements%hydrobal(e)%outflow
     end do
   end subroutine print_upstream_flows
 
 
-!==============================================================
-!   Print graph diagnostics (downstream/upstream neighbours, slopes, widths)
-!==============================================================
-   subroutine print_graph_diagnostics()
+  !==============================================================
+  !   Print graph diagnostics
+  !==============================================================
+  subroutine print_graph_diagnostics()
     integer(kind=ikind) :: el, i, nb
     real(kind=rkind)    :: width, slope, nalt
 
@@ -637,135 +633,128 @@ subroutine init_flow_topology()
     print *, "--------------------------------------------------------------------------"
 
     do el = 1_ikind, elements%kolik
-       do i = 1_ikind, 3_ikind
+      do i = 1_ikind, 3_ikind
+        nb = elements%downstream(el)%els(i)
+        if (nb > 0_ikind) then
+          width = elements%downstream(el)%widths(i)
+          slope = elements%downstream(el)%slopes(i)
+          nalt  = elements%avgalt(nb)
+          print *, el, nb, "down", elements%avgalt(el), nalt, slope, width
+        end if
 
-          ! downstream neighbours stored in elements%downstream(el)
-          nb = elements%downstream(el)%els(i)
-          if (nb > 0_ikind) then
-             width = elements%downstream(el)%widths(i)
-             slope = elements%downstream(el)%slopes(i)
-             nalt  = elements%avgalt(nb)
-
-             print *, el, nb, "down", elements%avgalt(el), nalt, slope, width
-          end if
-
-          ! upstream neighbours stored in elements%upstream(el)
-          nb = elements%upstream(el)%els(i)
-          if (nb > 0_ikind) then
-             width = elements%upstream(el)%widths(i)
-             slope = elements%upstream(el)%slopes(i)
-             nalt  = elements%avgalt(nb)
-
-             print *, el, nb, "up", elements%avgalt(el), nalt, slope, width
-          end if
-
-       end do
+        nb = elements%upstream(el)%els(i)
+        if (nb > 0_ikind) then
+          width = elements%upstream(el)%widths(i)
+          slope = elements%upstream(el)%slopes(i)
+          nalt  = elements%avgalt(nb)
+          print *, el, nb, "up", elements%avgalt(el), nalt, slope, width
+        end if
+      end do
     end do
 
     print *, "--------------------------------------------------------------------------"
   end subroutine print_graph_diagnostics
 
 
-!==============================================================
-!  Print element balance
-!==============================================================
-subroutine print_element_balance(n_steps)
-  integer(kind=ikind), intent(in) :: n_steps
-  integer(kind=ikind) :: i
-  real(kind=rkind)    :: surplus
+  !==============================================================
+  !  Print element balance
+  !==============================================================
+  subroutine print_element_balance(tstep)
+    integer(kind=ikind), intent(in) :: tstep
+    integer(kind=ikind) :: i
+    real(kind=rkind)    :: surplus
 
-  if (.not. allocated(elements%hydrobal)) then
-     print *, "No hydrological data to display."
-     return
-  end if
+    if (.not. allocated(elements%hydrobal)) then
+      print *, "No hydrological data to display."
+      return
+    end if
 
-  print *, "----------------------------------------------------------------------------------------------------------------"
-  print *, " Element |     P        ET      Qsurf       Li       Qgw      Qin     Surplus   Qout_elem  Overflow    deltaS"
-  print *, "----------------------------------------------------------------------------------------------------------------"
+    print *, "----------------------------------------------------------------------------------------------------------------"
+    print *, " Element |     P        ET      Qsurf       Li       Qgw      Qin     Surplus   Qout_elem  Overflow    deltaS"
+    print *, "----------------------------------------------------------------------------------------------------------------"
 
-  do i = 1_ikind, elements%kolik
-     surplus = elements%hydrobal(i)%Qsurf + &
-               elements%hydrobal(i)%Li    + &
-               elements%hydrobal(i)%Qgw
+    do i = 1_ikind, elements%kolik
+      surplus = elements%hydrobal(i)%Qsurf + &
+                elements%hydrobal(i)%Li    + &
+                elements%hydrobal(i)%Qgw
 
-     print *, i, precip(i,n_steps), elements%hydrobal(i)%ET, &
-              elements%hydrobal(i)%Qsurf, elements%hydrobal(i)%Li, &
-              elements%hydrobal(i)%Qgw, elements%hydrobal(i)%inflow, &
-              surplus, elements%hydrobal(i)%outflow, &
-              elements%overflow(i), &
-              elements%hydrobal(i)%deltas
-  end do
-
-end subroutine print_element_balance
+      print *, i, precip(i,tstep), elements%hydrobal(i)%ET, &
+               elements%hydrobal(i)%Qsurf, elements%hydrobal(i)%Li, &
+               elements%hydrobal(i)%Qgw, elements%hydrobal(i)%inflow, &
+               surplus, elements%hydrobal(i)%outflow, &
+               elements%overflow(i), elements%hydrobal(i)%deltas
+    end do
+  end subroutine print_element_balance
 
 
-!==============================================================
-!   EXPORT ELEMENT WATER BALANCE TO CSV
-!==============================================================
-subroutine export_element_balance(filename, n_steps)
-  character(len=*), intent(in) :: filename
-  integer(kind=ikind), intent(in) :: n_steps
-  integer(kind=ikind) :: i
-  integer :: unit, ios
-  real(kind=rkind) :: surplus, qout_catch
+  !==============================================================
+  !   EXPORT ELEMENT WATER BALANCE TO CSV
+  !==============================================================
+  subroutine export_element_balance(filename, tstep)
+    character(len=*), intent(in) :: filename
+    integer(kind=ikind), intent(in) :: tstep
+    integer(kind=ikind) :: i
+    integer :: unit, ios
+    real(kind=rkind) :: surplus, qout_catch
 
-  if (.not. allocated(elements%hydrobal)) then
-     print *, "No hydrological data to export."
-     return
-  end if
+    if (.not. allocated(elements%hydrobal)) then
+      print *, "No hydrological data to export."
+      return
+    end if
 
-  open(newunit=unit, file=filename, status="replace", action="write", iostat=ios)
-  if (ios /= 0) then
-     print *, "Error opening file: ", trim(filename)
-     return
-  end if
+    open(newunit=unit, file=filename, status="replace", action="write", iostat=ios)
+    if (ios /= 0) then
+      print *, "Error opening file: ", trim(filename)
+      return
+    end if
 
-  write(unit,'(A)') "Element,Area,z_avg,Downstream," // &
-                    "P,ET,Qsurf,Li,Qgw,Qin,Surplus," // &
-                    "Qout_elem,Qout_catchment,Overflow,DeltaS,Qsurf_local"
+    write(unit,'(A)') "Element,Area,z_avg,Downstream," // &
+                      "P,ET,Qsurf,Li,Qgw,Qin,Surplus," // &
+                      "Qout_elem,Qout_catchment,Overflow,DeltaS,Qsurf_local"
 
-  do i = 1_ikind, elements%kolik
-     surplus = elements%hydrobal(i)%Qsurf + &
-               elements%hydrobal(i)%Li    + &
-               elements%hydrobal(i)%Qgw
+    do i = 1_ikind, elements%kolik
+      surplus = elements%hydrobal(i)%Qsurf + &
+                elements%hydrobal(i)%Li    + &
+                elements%hydrobal(i)%Qgw
 
-     if (downstream(i) == 0_ikind) then
+      if (downstream(i) == 0_ikind) then
         qout_catch = elements%hydrobal(i)%outflow
-     else
+      else
         qout_catch = 0.0_rkind
-     end if
+      end if
 
-     print*, &
-          i,                              &
-          elements%area(i),               &
-          elements%avgalt(i),             &
-          downstream(i),                  &
-          precip(i,n_steps),              &
-          elements%hydrobal(i)%ET,        &
-          elements%hydrobal(i)%Qsurf,     &
-          elements%hydrobal(i)%Li,        &
-          elements%hydrobal(i)%Qgw,       &
-          elements%hydrobal(i)%inflow,    &
-          surplus,                        &
-          elements%hydrobal(i)%outflow,   &
-          qout_catch,                     &
-          elements%overflow(i),           &
-          elements%hydrobal(i)%deltas,    &
-          Qsurf_result(i,n_steps)
-  end do
+      write(unit,'(I4, ",", F10.3, ",", F10.3, ",", I4, 12(",",F10.3))') &
+           i,                              &
+           elements%area(i),               &
+           elements%avgalt(i),             &
+           downstream(i),                  &
+           precip(i,tstep),                &
+           elements%hydrobal(i)%ET,        &
+           elements%hydrobal(i)%Qsurf,     &
+           elements%hydrobal(i)%Li,        &
+           elements%hydrobal(i)%Qgw,       &
+           elements%hydrobal(i)%inflow,    &
+           surplus,                        &
+           elements%hydrobal(i)%outflow,   &
+           qout_catch,                     &
+           elements%overflow(i),           &
+           elements%hydrobal(i)%deltas,    &
+           Qsurf_result(i,tstep)
+    end do
 
-  close(unit)
-  print *, "Element balances saved to: ", trim(filename)
-end subroutine export_element_balance
+    close(unit)
+    print *, "Element balances saved to: ", trim(filename)
+  end subroutine export_element_balance
 
-!==============================================================
-!   Routing
-!==============================================================
-subroutine route_step(n_steps)
-    integer(kind=ikind), intent(in) :: n_steps
+
+  !==============================================================
+  !   Routing
+  !==============================================================
+  subroutine route_step(tstep)
+    integer(kind=ikind), intent(in) :: tstep
 
     integer(kind=ikind) :: el, i, dwn
-    real(kind=rkind)    :: old_storage, local_input, local_losses, surplus 
+    real(kind=rkind)    :: old_storage, local_input, local_losses, surplus
     real(kind=rkind), allocatable :: overflow_total(:), storage_new(:)
 
     allocate(overflow_total(elements%kolik))
@@ -778,64 +767,64 @@ subroutine route_step(n_steps)
     storage_new    = storage
 
     do el = 1_ikind, elements%kolik
-       old_storage = storage(el)
+      old_storage = storage(el)
 
-       local_input = precip(el,n_steps) + qinter(el,n_steps) + old_storage
+      local_input = precip(el,tstep) + qinter(el,tstep) + old_storage
 
-       local_losses = elements%hydrobal(el)%ET + &
-                      elements%hydrobal(el)%Li + &
-                      elements%hydrobal(el)%Qgw
+      local_losses = elements%hydrobal(el)%ET + &
+                     elements%hydrobal(el)%Li + &
+                     elements%hydrobal(el)%Qgw
 
-       if (local_losses >= local_input) then
-          storage_new(el) = 0.0_rkind
+      if (local_losses >= local_input) then
+        storage_new(el) = 0.0_rkind
+        surplus         = 0.0_rkind
+      else
+        surplus = local_input - local_losses
+
+        if (surplus <= capacity(el)) then
+          storage_new(el) = surplus
           surplus         = 0.0_rkind
-       else
-          surplus = local_input - local_losses
+        else
+          storage_new(el) = capacity(el)
+          surplus         = surplus - capacity(el)
+        end if
+      end if
 
-          if (surplus <= capacity(el)) then
-             storage_new(el) = surplus
-             surplus         = 0.0_rkind
-          else
-             storage_new(el) = capacity(el)
-             surplus         = surplus - capacity(el)
-          end if
-       end if
-
-       overflow_total(el) = surplus + Qsurf_result(el,n_steps)
+      overflow_total(el) = surplus
     end do
 
-    outlet_Q(n_steps) = 0.0_rkind
+    outlet_Q(tstep) = 0.0_rkind
 
     do i = 1_ikind, elements%kolik
-       el  = flow_order(i)
-       dwn = downstream(el)
+      el  = flow_order(i)
+      dwn = downstream(el)
 
-       elements%hydrobal(el)%outflow = elements%hydrobal(el)%inflow + overflow_total(el)
+      elements%hydrobal(el)%outflow = elements%hydrobal(el)%inflow + overflow_total(el)
 
-       if (dwn > 0_ikind) then
-          elements%hydrobal(dwn)%inflow = elements%hydrobal(dwn)%inflow + &
-                                          elements%hydrobal(el)%outflow
-       else
-          outlet_Q(n_steps) = outlet_Q(n_steps) + elements%hydrobal(el)%outflow
-       end if
+      if (dwn > 0_ikind) then
+        elements%hydrobal(dwn)%inflow = elements%hydrobal(dwn)%inflow + &
+                                        elements%hydrobal(el)%outflow
+      else
+        outlet_Q(tstep) = outlet_Q(tstep) + elements%hydrobal(el)%outflow
+      end if
     end do
 
     do el = 1_ikind, elements%kolik
-       old_storage           = storage(el)
-       storage(el)           = storage_new(el)
-       elements%overflow(el) = overflow_total(el)
+      old_storage           = storage(el)
+      storage(el)           = storage_new(el)
+      elements%overflow(el) = overflow_total(el)
 
-       elements%hydrobal(el)%deltas = precip(el,n_steps) + &
-                                      qinter(el,n_steps) + &
-                                      old_storage + &
-                                      elements%hydrobal(el)%inflow - &
-                                      ( elements%hydrobal(el)%ET      + &
-                                        elements%hydrobal(el)%Li      + &
-                                        elements%hydrobal(el)%Qgw     + &
-                                        storage(el)                   + &
-                                        elements%hydrobal(el)%outflow )
+      elements%hydrobal(el)%deltas = precip(el,tstep) + &
+                                     qinter(el,tstep) + &
+                                     old_storage + &
+                                     elements%hydrobal(el)%inflow - &
+                                     ( elements%hydrobal(el)%ET      + &
+                                       elements%hydrobal(el)%Li      + &
+                                       elements%hydrobal(el)%Qgw     + &
+                                       storage(el)                   + &
+                                       elements%hydrobal(el)%outflow )
 
-       deltas(el,n_steps) = elements%hydrobal(el)%deltas
+      deltas(el,tstep) = elements%hydrobal(el)%deltas
     end do
 
     deallocate(overflow_total, storage_new)

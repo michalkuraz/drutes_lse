@@ -70,7 +70,7 @@ program nour
    ! 3) Initialize hydrological inputs and parameters
   !     (from your initvals module)
   ! ---------------------------------------------------
-  call init_hydro()    ! from initvals
+  call init_hydro()    ! from tools
 
     
   ! ----------------------------------------------------
@@ -78,41 +78,32 @@ program nour
   ! ----------------------------------------------------
   call compute_all()       ! from hydrofunction
 
-  call print_upstream_flows()    ! from tools
+  do t = 1, n_steps
+   call print_upstream_flows(t)
+end do    ! from tools
 
   ! ----------------------------------------------------
   ! 5) Print and export results
   ! ----------------------------------------------------
-      print *, "--------------------------------------------------------------------------------------------------------------"
-  print *, " Element |     P        ET      Qsurf       Li       Qgw      Qin     Surplus " // &
-         " Qout_elem  Qout_catch  Overflow   deltaS"
-  print *, "--------------------------------------------------------------------------------------------------------------"
+    print *, "--------------------------------------------------------------------------------"
+print *, " Step Elem     P       ET      Qsurf      Li       Qgw       Qin"
+print *, "           Qout   Overflow   Storage   deltaS"
+print *, "--------------------------------------------------------------------------------"
+
+do t = 1, n_steps
+  print *, " "
+  print *, "==================== TIME STEP ", t, " ===================="
 
   do i = 1, elements%kolik
-
-     ! Local surplus before routing
-     surplus = elements%hydrobal(i)%Qsurf + &
-               elements%hydrobal(i)%Li    + &
-               elements%hydrobal(i)%Qgw
-
-     ! Part that actually leaves the catchment (only for outlet elements)
-     if (downstream(i) == 0_ikind) then
-        qout_catch = elements%hydrobal(i)%outflow
-     else
-        qout_catch = 0.0_rkind
-     end if
-
-     print*, i, &
-          precip(i,n_steps), elements%hydrobal(i)%ET, &
-          elements%hydrobal(i)%Qsurf, elements%hydrobal(i)%Li, &
-          elements%hydrobal(i)%Qgw, elements%hydrobal(i)%inflow, &
-          surplus, elements%hydrobal(i)%outflow, &
-          qout_catch, elements%overflow(i), &
-          elements%hydrobal(i)%deltas
-          
+     print *, t, i, &
+              precip(i,t), ET_flux(i,t), Qsurf_result(i,t), &
+              L_result(i,t), Qgw_result(i,t), Qin_result(i,t), &
+              Qout_result(i,t), Overflow_result(i,t), &
+              Storage_result(i,t), deltas(i,t)
   end do
+end do
 
- call export_element_balance("element_balance.csv", n_steps)    ! from tools
+ call export_element_balance("element_balance.csv")    ! from tools
   print *, "-----------------------------------------------"
   print *, " Element |  z_avg   Qsurf_local"
   do i = 1, elements%kolik
@@ -123,13 +114,22 @@ program nour
 
 
   print *, "-----------------------------------------------"
-  print *, " Catchment outlet hydrograph (per time step):"
-  do i = 1, n_steps
-     print *, " step ", i, "  Q_out = ", outlet_Q(i)
-  end do
+print *, " Catchment outlet hydrograph"
+print *, " Step    Q_out(mm/step)    Q_out(m3/s)"
+
+    do t = 1, n_steps
+      print *, t, outlet_Q(t), outlet_Q_m3s(t)
+    end do
     ! Export outlet hydrograph to CSV
   open(newunit=unit, file="outlet_hydrograph.csv", status="replace", action="write")
-  write(unit,'(A)') "step,Q_out"
+   write(unit,'(A)') "step,Q_out_mm_per_step,Q_out_m3s"
+
+   do t = 1, n_steps
+     write(unit,'(I4,",",F12.6,",",F12.6)') t, outlet_Q(t), outlet_Q_m3s(t)
+   end do
+
+  close(unit)
+  print *, "Outlet hydrograph saved to: outlet_hydrograph.csv"
 
   
   close(unit)

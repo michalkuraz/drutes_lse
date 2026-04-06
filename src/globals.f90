@@ -3,6 +3,7 @@ module globals
   use typy
   implicit none
 
+ 
   ! Time/progress helpers
   real(kind=rkind) :: tmp, tmp1, sim_time, start_time, end_time, time, time_step
   logical          :: www

@@ -85,19 +85,15 @@ contains
     Qgw_result   = 0.0_rkind
     deltas       = 0.0_rkind
 
-    do i = 1, elements%kolik
-     conduct(i) = 3.0e-6_rkind + 4.0e-8_rkind * elements%avgalt(i)
-      G(i)       = 0.0_rkind
-    end do
+    
+     
+   
 
     if (n_steps < 10) stop "Need at least 10 time steps for the hardcoded forcing."
 
     do i = 1, elements%kolik
-      precip(i,1:10) = [ &
-          0.0_rkind, 0.0_rkind, 17.0_rkind, 12.0_rkind, 9.0_rkind, &
+      precip(i,1:10) = [ 0.0_rkind, 0.0_rkind, 17.0_rkind, 12.0_rkind, 9.0_rkind, &
           7.0_rkind, 40.0_rkind, 0.0_rkind, 0.0_rkind, 3.0_rkind ]
-
-      precip(i,:) = precip(i,:) * (0.90_rkind + 0.0020_rkind * (elements%avgalt(i) - 115.0_rkind))
 
 
       qinter(i,1:10) = [0.0_rkind, 0.0_rkind, 0.015_rkind, 0.018_rkind, 0.02_rkind, &
@@ -121,16 +117,16 @@ contains
       RHmin(i,1:10) = [56.0_rkind, 64.0_rkind, 64.0_rkind, 77.0_rkind, 77.0_rkind, &
                        76.0_rkind, 74.0_rkind, 59.0_rkind, 62.0_rkind, 61.0_rkind]
 
-      soilcontent(i,1:10) = [ &
-           0.05_rkind, 0.055_rkind, 0.062_rkind, 0.060_rkind, 0.040_rkind, &
+      soilcontent(i,1:10) = [0.05_rkind, 0.055_rkind, 0.062_rkind, 0.060_rkind, 0.040_rkind, &
            0.070_rkind, 0.090_rkind, 0.200_rkind, 0.250_rkind, 0.265_rkind ]
 
-      soilcontent(i,:) = soilcontent(i,:) * (1.10_rkind - 0.0015_rkind * (elements%avgalt(i) - 115.0_rkind))
+      
       
     end do
 
   
-
+   conduct = 0.0_rkind
+    G      = 0.0_rkind
     CN         = 98
     z          = 3.0_rkind
     Julian_day = 172

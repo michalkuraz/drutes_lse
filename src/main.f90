@@ -104,6 +104,7 @@ do t = 1, n_steps
 end do
 
  call export_element_balance("element_balance.csv")    ! from tools
+
   print *, "-----------------------------------------------"
   print *, " Element |  z_avg   Qsurf_local"
   do i = 1, elements%kolik
@@ -124,16 +125,13 @@ print *, " Step    Q_out(mm/step)    Q_out(m3/s)"
   open(newunit=unit, file="outlet_hydrograph.csv", status="replace", action="write")
    write(unit,'(A)') "step,Q_out_mm_per_step,Q_out_m3s"
 
-   do t = 1, n_steps
-     write(unit,'(I4,",",F12.6,",",F12.6)') t, outlet_Q(t), outlet_Q_m3s(t)
-   end do
+   
 
   close(unit)
   print *, "Outlet hydrograph saved to: outlet_hydrograph.csv"
 
   
-  close(unit)
-  print *, " Outlet hydrograph saved to: outlet_hydrograph.csv"
+
 
 
 

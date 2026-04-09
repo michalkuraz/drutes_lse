@@ -125,7 +125,7 @@ contains
     end do
 
   
-   conduct = 0.0_rkind
+   conduct = 0.00002_rkind
     G      = 0.0_rkind
     CN         = 98
     z          = 3.0_rkind

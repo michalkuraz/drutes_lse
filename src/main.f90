@@ -15,19 +15,10 @@ program nour
 
 
 
-  ! ----------------------------------------------------
-  ! 0) Get mesh file name from command line or default
-  ! ----------------------------------------------------
-  nc = command_argument_count()
-  if (nc >= 1) then
-     call get_command_argument(1, mesh_file_name)
-  else
-     mesh_file_name = "mesh.txt"
-  end if
 
-  print *, " Opening mesh file: ", trim(mesh_file_name)
-  inquire(file=mesh_file_name, exist=file_exists)
-  if (.not. file_exists) stop " Mesh file not found!"
+  mesh_file_name = "mesh.txt"
+
+
 
   ! ----------------------------------------------------
   ! 1) Read mesh & compute geometry
@@ -36,17 +27,6 @@ program nour
   call compute_areas()             ! from tools
   call compute_avgalt()            ! from tools
 
-  print *, "-----------------------------------------------"
-  print *, " Node Coordinates"
-  do i = 1, nodes%kolik
-     print *, i, nodes%data(i,1), nodes%data(i,2), nodes%altitude(i)
-  end do
-
-  print *, "-----------------------------------------------"
-  print *, " Element Areas & avg z"
-  do i = 1, elements%kolik
-     print *, i, elements%area(i), elements%avgalt(i)
-  end do
 
   ! ----------------------------------------------------
   ! 2) Flow topology (neighbours, downstream, order)
@@ -56,15 +36,6 @@ program nour
   call print_graph_diagnostics()     ! from tools
   
 
-  print *, "-----------------------------------------------"
-  print *, " Downstream Graph"
-  do i = 1, elements%kolik
-     if (downstream(i) > 0) then
-        print*, " Element ", i, " drains to element ", downstream(i)
-     else
-        print*, " Element ", i, " drains to outlet"
-     end if
-  end do
 
   ! ----------------------------------------------------
    ! 3) Initialize hydrological inputs and parameters
@@ -80,7 +51,7 @@ program nour
 
   do t = 1, n_steps
    call print_upstream_flows(t)
-end do    ! from tools
+  end do    ! from tools
 
   ! ----------------------------------------------------
   ! 5) Print and export results

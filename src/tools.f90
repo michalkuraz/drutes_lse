@@ -54,9 +54,9 @@ contains
     real(kind=rkind) :: avgval
     integer(kind=ikind) :: i
 
-    avgval = 0.0_rkind
+   avgval = 0.0_rkind
     do i = 1, size(r)
-      avgval = avgval + r(i)
+     avgval = avgval + r(i)
     end do
     avgval = avgval / real(size(r), kind=rkind)
   end function avg

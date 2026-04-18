@@ -4,7 +4,11 @@ program nour
   use globals
   use hydrofnc
   use tools
-  implicit none
+  use routing
+  use hydrotools
+  use hydroprint
+  use solver
+    implicit none
 
    integer(kind=ikind) :: i, nc,t
    integer :: unit

@@ -1,5 +1,11 @@
 module solver
-
+  use typy
+  use globals
+  use hydrotools
+  use tools
+  use hydrofnc
+  use routing, only: route_step
+  
   contains
 
  !==============================================================

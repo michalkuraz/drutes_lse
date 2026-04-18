@@ -1,4 +1,8 @@
 module hydrotools
+ use typy
+  use globals
+  use tools
+  
 
 contains
 
@@ -8,9 +12,9 @@ contains
   !==============================================================
   subroutine read_mesh(filename)
     character(len=*), intent(in) :: filename
-    integer :: fileid, ios, tmp
+    integer :: fileid, ios
     integer :: id, n1, n2, n3, i
-    real(kind=rkind) :: x, y, zloc
+    real(kind=rkind) :: x, y, zloc, tmp
     character(len=256) :: line
     logical :: file_exists
 
@@ -30,7 +34,7 @@ contains
     
     do i=1, nodes%kolik
       call comment(fileid)
-      read(filed, *) tmp, nodes%data(i,:), nodes%altitude(i)
+      read(fileid, *) tmp, nodes%data(i,:), nodes%altitude(i)
     end do
     
     call comment(fileid)

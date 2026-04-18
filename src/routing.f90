@@ -1,4 +1,10 @@
 module routing
+ use typy
+ use globals
+ use hydrotools
+ use tools
+ use hydrofnc
+  Implicit none
 
 contains
 

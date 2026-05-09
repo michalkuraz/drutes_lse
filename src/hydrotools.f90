@@ -2,6 +2,7 @@ module hydrotools
  use typy
   use globals
   use tools
+   use readtools, only: comment
   
 
 contains
@@ -10,64 +11,84 @@ contains
   !==============================================================
   !   READ MESH (nodes + elements)
   !==============================================================
-  subroutine read_mesh(filename)
+   subroutine read_mesh(filename)
     character(len=*), intent(in) :: filename
-    integer :: fileid, ios
+    integer :: unit, ios, n_nodes, n_elem
     integer :: id, n1, n2, n3, i
-    real(kind=rkind) :: x, y, zloc, tmp
+    real(kind=rkind) :: x, y, zloc
     character(len=256) :: line
     logical :: file_exists
 
+    inquire(file=filename, exist=file_exists)
+    if (.not. file_exists) then
+       print *, " Error: File ", trim(filename), " not found."
+       stop
+    end if
 
-
-    open(newunit=fileid, file=filename, status="old", action="read", iostat=ios)
-    
+    open(newunit=unit, file=filename, status="old", action="read", iostat=ios)
     if (ios /= 0) stop " Could not open mesh file."
-    call comment(fileid)
-    
-    read(fileid, *) nodes%kolik 
-    
 
-    allocate(nodes%data(nodes%kolik,2))
-    allocate(nodes%altitude(nodes%kolik))
-
-    
-    do i=1, nodes%kolik
-      call comment(fileid)
-      read(fileid, *) tmp, nodes%data(i,:), nodes%altitude(i)
+    ! --- number of nodes ---
+    do
+       read(unit,'(A)',iostat=ios) line
+       if (ios < 0) stop "Unexpected EOF before node count"
+       if (len_trim(line) > 0 .and. line(1:1) /= "#") exit
     end do
-    
-    call comment(fileid)
-    
-    
-    read(line,*) elements%kolik
+    read(line,*) n_nodes
+    nodes%kolik = n_nodes
 
-    call mesh_allocater()
+    allocate(nodes%data(n_nodes,2))
+    allocate(nodes%altitude(n_nodes))
 
-    do i=1, elements%kolik
-      call comment(fileid)
-      read(fileid, *) tmp, elements%data(i,:)
+    i = 0
+    do while (i < n_nodes)
+       read(unit,'(A)',iostat=ios) line
+       if (ios < 0) exit
+       if (len_trim(line) == 0 .or. line(1:1) == "#") cycle
+       ! Expect: id  x   y   z
+       read(line,*) id, x, y, zloc
+       i = i + 1
+       nodes%data(i,1)   = x
+       nodes%data(i,2)   = y
+       nodes%altitude(i) = zloc
     end do
+    print *, " Read", i, "nodes."
 
+    ! --- number of elements ---
+    do
+       read(unit,'(A)',iostat=ios) line
+       if (ios < 0) stop "Unexpected EOF before element count"
+       if (len_trim(line) > 0 .and. line(1:1) /= "#") exit
+    end do
+    read(line,*) n_elem
+    elements%kolik = n_elem
 
+    allocate(elements%data(n_elem,3))
+    allocate(elements%area(n_elem))
+    allocate(elements%material(n_elem))
+    allocate(elements%avgalt(n_elem))
+    allocate(elements%overflow(n_elem))
+    allocate(elements%neighbours(n_elem,3))
+
+    i = 0
+    do while (i < n_elem)
+       read(unit,'(A)',iostat=ios) line
+       if (ios < 0) exit
+       if (len_trim(line) == 0 .or. line(1:1) == "#") cycle
+       read(line,*) id, n1, n2, n3
+       i = i + 1
+       elements%data(i,:)   = [n1, n2, n3]
+       elements%material(i) = 1_ikind
+    end do
+    print *, " Read", i, "triangular elements."
+    close(unit)
+
+    ! Allocate hydrological structure if needed
+    if (.not. allocated(elements%hydrobal)) then
+       allocate(elements%hydrobal(n_elem))
+    end if
   end subroutine read_mesh
-  
-  
-  subroutine mesh_allocater()
-  
-    allocate(elements%data(elements%kolik,3))
-    allocate(elements%area(elements%kolik))
-    allocate(elements%material(elements%kolik))
-    allocate(elements%avgalt(elements%kolik))
-    allocate(elements%overflow(elements%kolik))
-    allocate(elements%neighbours(elements%kolik,3))
-    allocate(elements%upstream(elements%kolik))
-    allocate(elements%downstream(elements%kolik))
-    allocate(elements%hydrobal(elements%kolik))
 
-  
-  
-  end subroutine mesh_allocater
 
  ! -----------------------------------------------------
   ! initialize and allocate

@@ -5,8 +5,8 @@ FC     = gfortran
 FFLAGS = -fimplicit-none  -fcoarray=single -fbounds-check -fbacktrace -g -g3 -fdefault-real-8 -O0 -finit-real=nan -Wsurprising
 FFLAGS += -Werror=line-truncation
 
-OBJS = typy.o  globals.o core_tools.o debug_tools.o printtools.o  tools.o \
-     hydrofnc.o hydroprint.o hydrotools.o solver.o routing.o readtools.o main.o 
+OBJS = typy.o globals.o core_tools.o debug_tools.o readtools.o printtools.o tools.o \
+     hydrofnc.o hydrotools.o routing.o solver.o hydroprint.o main.o
 
 TARGET = nour_model
 
@@ -38,18 +38,18 @@ printtools.o: src/printtools.f90 typy.o globals.o core_tools.o debug_tools.o
 tools.o: src/tools.f90 typy.o globals.o 
 	$(FC) $(FFLAGS) -c src/tools.f90
 
-hydrotools.o: src/hydrotools.f90 typy.o globals.o tools.o
+hydrotools.o: src/hydrotools.f90 typy.o globals.o tools.o readtools.o
 	$(FC) $(FFLAGS) -c src/hydrotools.f90
 
 hydrofnc.o: src/hydrofnc.f90 typy.o globals.o 
 	$(FC) $(FFLAGS) -c src/hydrofnc.f90
 
 
-solver.o: src/solver.f90 typy.o globals.o tools.o hydrotools.o hydrofnc.o
-	$(FC) $(FFLAGS) -c src/solver.f90
-
-routing.o: src/routing.f90 typy.o globals.o hydrotools.o hydrofnc.o tools.o solver.o
+routing.o: src/routing.f90 typy.o globals.o hydrotools.o hydrofnc.o tools.o
 	$(FC) $(FFLAGS) -c src/routing.f90
+
+solver.o: src/solver.f90 typy.o globals.o tools.o hydrotools.o hydrofnc.o routing.o
+	$(FC) $(FFLAGS) -c src/solver.f90
 
 hydroprint.o: src/hydroprint.f90 typy.o globals.o tools.o hydrotools.o hydrofnc.o routing.o solver.o
 	$(FC) $(FFLAGS) -c src/hydroprint.f90

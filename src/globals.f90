@@ -45,6 +45,7 @@ module globals
      integer(kind=ikind)              :: kolik = 0      ! number of elements
      integer(kind=ikind), allocatable :: neighbours(:,:)! (nel,max_neigh)
      real(kind=rkind),    allocatable :: avgalt(:)      ! mean elevation
+     real(kind=rkind),    allocatable :: slope(:)  ! local terrain slope [m/m]
      real(kind=rkind),    allocatable :: overflow(:)    ! local generated overflow
      type(stream_str), allocatable    :: downstream(:)
      type(stream_str), allocatable    :: upstream(:)
@@ -78,9 +79,12 @@ module globals
   
 
   ! Simulation time discretisation
-  integer(kind=ikind), parameter :: ntot_days = 10
-  real(kind=rkind),   parameter :: dt_days   = 1.0_rkind
-  integer(kind=ikind), parameter :: n_steps = int(ntot_days / dt_days)
+! Simulation time discretisation
+  real(kind=rkind), parameter    :: ntot_days  = 10.0_rkind
+  real(kind=rkind), parameter    :: dt_hours   = 1.0_rkind
+  real(kind=rkind), parameter    :: dt_days    = dt_hours / 24.0_rkind
+  real(kind=rkind), parameter    :: dt_seconds = dt_hours * 3600.0_rkind
+  integer(kind=ikind), parameter :: n_steps    = int(ntot_days / dt_days)
   integer(kind=ikind) :: CN, Julian_day 
   real(kind=rkind) :: phi, as, bs, z, alpha, sigma, gsc, ccrop
 
@@ -92,18 +96,18 @@ module globals
   real(kind=rkind), allocatable :: RHmax(:,:), RHmin(:,:), uz(:,:), soilcontent(:,:)
 
   real(kind=rkind), allocatable :: Qsurf_result(:,:), ET_flux(:,:), &
-                                   L_result(:,:), Qgw_result(:,:), deltas(:,:)
+                                   Inf_result(:,:), L_result(:,:), Qgw_result(:,:), deltas(:,:)
 
   integer, parameter :: terminal = 6
 
 
   ! NEW: upstream connectivity
-  integer(kind=ikind), allocatable :: upstream_count(:)
-  integer(kind=ikind), allocatable :: upstream_list(:,:)
+  !integer(kind=ikind), allocatable :: upstream_count(:)
+  !integer(kind=ikind), allocatable :: upstream_list(:,:)
 
 ! store routing values
-  real(kind=rkind), allocatable :: Qin_result(:,:), Qout_result(:,:), &
-                                 Overflow_result(:,:), Storage_result(:,:)
+  !real(kind=rkind), allocatable :: Qin_result(:,:), Qout_result(:,:), &
+                               !  Overflow_result(:,:), Storage_result(:,:)
 
   real(kind=rkind), allocatable :: outlet_Q_m3s(:)
 
@@ -135,7 +139,43 @@ module globals
   integer(kind=ikind), allocatable :: downstream(:) ! downstream element ID (0 = outlet)
   integer(kind=ikind), allocatable :: flow_order(:) ! processing order (upstream→downstream)
 
+
+  ! Layer hydraulic conductivities
+  real(kind=rkind), allocatable :: Ksat_surf(:)   ! surface saturated K [m/s]
+  real(kind=rkind), allocatable :: Ksat_sub(:)    ! subsurface saturated K [m/s]
+  real(kind=rkind), allocatable :: Ksat_gw(:)     ! groundwater saturated K [m/s]
+
+  real(kind=rkind) :: ksurf_exp
+  real(kind=rkind) :: ksub_exp
+
+  real(kind=rkind) :: cn_slope_coeff
+  real(kind=rkind) :: infil_slope_coeff
+  real(kind=rkind) :: min_edge_width 
+
+  real(kind=rkind) :: qgw_slope_coeff
+  real(kind=rkind) :: storage_slope_coeff
+  real(kind=rkind) :: theta_r, theta_s
+
   ! Number of time steps (set in initvals)
   integer(kind=ikind) :: nsteps = 0
+
+
+
+! Three-layer storages [m3]
+real(kind=rkind), allocatable :: Ssurf(:), Ssub(:), Sgw(:)
+
+! Fluxes as depth per step [m/step]
+real(kind=rkind), allocatable :: Pm(:,:), E_m(:,:), If_m(:,:), Qsurf_m(:,:)
+real(kind=rkind), allocatable :: Tv_m(:,:), Qsub_m(:,:), Rv_m(:,:), Qgw_m(:,:)
+
+! Fluxes as volume per step [m3/step]
+real(kind=rkind), allocatable :: Pv(:,:), Ev(:,:), Ifv(:,:), Qsurfv(:,:)
+real(kind=rkind), allocatable :: Tvv(:,:), Qsubv(:,:), Rvv(:,:), Qgwv(:,:)
+
+! ODE storage increments [m3/step]
+real(kind=rkind), allocatable :: dVsurf(:,:), dVsub(:,:), dVgw(:,:)
+
+! Storage histories [m3]
+real(kind=rkind), allocatable :: Ssurf_hist(:,:), Ssub_hist(:,:), Sgw_hist(:,:)
 
 end module globals

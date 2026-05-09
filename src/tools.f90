@@ -190,6 +190,50 @@ contains
     l = sqrt((A(1)-B(1))*(A(1)-B(1)) + (A(2)-B(2))*(A(2)-B(2)))
   end function dist
 
+    !==============================================================
+  !   COMPUTE local element slope from triangle plane
+  !   slope = sqrt( (dz/dx)^2 + (dz/dy)^2 )   [m/m]
+  !==============================================================
+  subroutine compute_element_slopes()
+    integer(kind=ikind) :: i, n1, n2, n3
+    real(kind=rkind) :: x1, y1, z1
+    real(kind=rkind) :: x2, y2, z2
+    real(kind=rkind) :: x3, y3, z3
+    real(kind=rkind) :: ux, uy, uz1
+    real(kind=rkind) :: vx, vy, vz1
+    real(kind=rkind) :: nx, ny, nz
+    real(kind=rkind) :: dzdx, dzdy
+
+    do i = 1_ikind, elements%kolik
+      n1 = elements%data(i,1)
+      n2 = elements%data(i,2)
+      n3 = elements%data(i,3)
+
+      x1 = nodes%data(n1,1); y1 = nodes%data(n1,2); z1 = nodes%altitude(n1)
+      x2 = nodes%data(n2,1); y2 = nodes%data(n2,2); z2 = nodes%altitude(n2)
+      x3 = nodes%data(n3,1); y3 = nodes%data(n3,2); z3 = nodes%altitude(n3)
+
+      ux  = x2 - x1
+      uy  = y2 - y1
+      uz1 = z2 - z1
+
+      vx  = x3 - x1
+      vy  = y3 - y1
+      vz1 = z3 - z1
+
+      nx = uy  * vz1 - uz1 * vy
+      ny = uz1 * vx  - ux  * vz1
+      nz = ux  * vy  - uy  * vx
+
+      if (abs(nz) > 1.0e-12_rkind) then
+        dzdx = -nx / nz
+        dzdy = -ny / nz
+        elements%slope(i) = sqrt(dzdx*dzdx + dzdy*dzdy)
+      else
+        elements%slope(i) = 0.0_rkind
+      end if
+    end do
+  end subroutine compute_element_slopes
 
 
 

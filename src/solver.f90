@@ -5,95 +5,102 @@ module solver
   use tools
   use hydrofnc
   use routing, only: route_step
-  
-  contains
+  implicit none
 
- !==============================================================
-  !  Main driver: compute all steps with routing
-  !==============================================================
-  subroutine compute_all()
-    use tools
-    integer(kind=ikind) :: el, t
-    real(kind=rkind)    :: ET_pot, ET_act
-    real(kind=rkind)    :: Qsurf_loc
-    real(kind=rkind)    :: Qgw_pot, Qgw_act
-    real(kind=rkind)    :: water_available
-    real(kind=rkind)    :: water_after_ET
+contains
 
-    do 
-      t = t + 1
-      time  = time + time_step
+  subroutine update_storage_odes(tstep)
+    integer(kind=ikind), intent(in) :: tstep
+    integer(kind=ikind) :: el
+    real(kind=rkind) :: Ai, Ssub_mm, Sgw_mm
 
-      do el = 1, elements%kolik
+    do el = 1, elements%kolik
 
-        ! -----------------------------------------------
-        ! 1) Potential fluxes
-        ! -----------------------------------------------
-        ET_pot    = penman_monteith(el, t) * ccrop
-        Qsurf_loc = surface_runoff(el, t)
-        Qgw_pot   = ground_water(el, t)
+      Ai = elements%area(el)
 
-        ! -----------------------------------------------
-        ! 2) Water available after quick runoff
-        ! -----------------------------------------------
-        water_available = precip(el, t) + qinter(el, t) + storage(el) - Qsurf_loc
+      ! ----------------------------------------------------
+      ! All fluxes here are mm per timestep
+      ! ----------------------------------------------------
+     Pm(el,tstep)      = precip_m_step(el,tstep)
+     E_m(el,tstep)     = evap_m_step(el,tstep)
+     If_m(el,tstep)    = min(infil_m_step(el,tstep), Pm(el,tstep))
+     Qsurf_m(el,tstep) = qsurf_m_step(el,tstep)
 
-        if (water_available < 0.0_rkind) then
-          water_available = 0.0_rkind
-        end if
+    ! Convert current storages to mm
+     Ssub_mm = Ssub(el) / Ai * 1000.0_rkind
+     Sgw_mm  = Sgw(el)  / Ai * 1000.0_rkind
 
-        ! -----------------------------------------------
-        ! 3) Limit actual ET by available water
-        ! -----------------------------------------------
-        ET_act = min(ET_pot, water_available)
+    ! Add this-step infiltration to available subsurface water
+      Ssub_mm = Ssub_mm + If_m(el,tstep)
 
-        ! -----------------------------------------------
-        ! 4) Water left after ET
-        ! -----------------------------------------------
-        water_after_ET = water_available - ET_act
+    ! Use small fractions per timestep, not the full potential
+      Tv_m(el,tstep)   = min(0.02_rkind * Ssub_mm, Ssub_mm)
+      Qsub_m(el,tstep) = min(0.05_rkind * Ssub_mm, Ssub_mm - Tv_m(el,tstep))
+      Rv_m(el,tstep)   = min(0.03_rkind * Ssub_mm, Ssub_mm - Tv_m(el,tstep) - Qsub_m(el,tstep))
 
-        if (water_after_ET < 0.0_rkind) then
-          water_after_ET = 0.0_rkind
-        end if
+    ! Groundwater receives recharge, then discharges slowly
+      Sgw_mm = Sgw_mm + Rv_m(el,tstep)
+      Qgw_m(el,tstep) = min(0.02_rkind * Sgw_mm, Sgw_mm)
 
-        ! -----------------------------------------------
-        ! 5) Limit actual groundwater flow by remaining water
-        ! -----------------------------------------------
-        Qgw_act = min(Qgw_pot, water_after_ET)
+      ! ----------------------------------------------------
+      ! Storage increments in m3
+      ! depth mm -> m by /1000
+      ! ----------------------------------------------------
+      dVsurf(el,tstep) = (Pm(el,tstep) - If_m(el,tstep) - &
+                          E_m(el,tstep) - Qsurf_m(el,tstep)) / &
+                          1000.0_rkind * Ai
 
-        ! -----------------------------------------------
-        ! 6) Store local fluxes
-        ! -----------------------------------------------
-        elements%hydrobal(el)%ET    = ET_act
-        elements%hydrobal(el)%Qsurf = Qsurf_loc
-        elements%hydrobal(el)%Qgw   = Qgw_act
+      dVsub(el,tstep) = (If_m(el,tstep) - Tv_m(el,tstep) - &
+                         Qsub_m(el,tstep) - Rv_m(el,tstep)) / &
+                         1000.0_rkind * Ai
 
-        ET_flux(el, t)      = elements%hydrobal(el)%ET
-        Qsurf_result(el, t) = elements%hydrobal(el)%Qsurf
-        Qgw_result(el, t)   = elements%hydrobal(el)%Qgw
+      dVgw(el,tstep) = (Rv_m(el,tstep) - Qgw_m(el,tstep)) / &
+                       1000.0_rkind * Ai
 
-        ! -----------------------------------------------
-        ! 7) Leakage after ET, runoff, and groundwater are known
-        ! -----------------------------------------------
-        elements%hydrobal(el)%Li = max(0.0_rkind, &
-             qinter(el, t) + precip(el, t) - &
-             ET_flux(el, t) - Qsurf_result(el, t) - Qgw_result(el, t))
+      Ssurf(el) = max(0.0_rkind, Ssurf(el) + dVsurf(el,tstep))
+      Ssub(el)  = max(0.0_rkind, Ssub(el)  + dVsub(el,tstep))
+      Sgw(el)   = max(0.0_rkind, Sgw(el)   + dVgw(el,tstep))
 
-        L_result(el, t) = elements%hydrobal(el)%Li
+      Ssurf_hist(el,tstep) = Ssurf(el)
+      Ssub_hist(el,tstep)  = Ssub(el)
+      Sgw_hist(el,tstep)   = Sgw(el)
 
-        ! Reset routed terms for this step
-        elements%hydrobal(el)%inflow  = 0.0_rkind
-        elements%hydrobal(el)%outflow = 0.0_rkind
-        elements%hydrobal(el)%deltas  = 0.0_rkind
+      ! ----------------------------------------------------
+      ! Routing variables: mm per timestep
+      ! ----------------------------------------------------
+      ET_flux(el,tstep)      = E_m(el,tstep)
+      Inf_result(el,tstep)   = If_m(el,tstep)
+      Qsurf_result(el,tstep) = Qsurf_m(el,tstep)
+      Qgw_result(el,tstep)   = Qgw_m(el,tstep)
 
-      end do
+       L_result(el,tstep) = If_m(el,tstep)
 
-      call route_step(t)
-      
-      if (time > end_time) EXIT
+      elements%hydrobal(el)%ET    = ET_flux(el,tstep)
+      elements%hydrobal(el)%Qsurf = Qsurf_result(el,tstep)
+      elements%hydrobal(el)%Qgw   = Qgw_result(el,tstep)
+      elements%hydrobal(el)%Li    = L_result(el,tstep)
+
+      elements%hydrobal(el)%inflow  = 0.0_rkind
+      elements%hydrobal(el)%outflow = 0.0_rkind
+      elements%hydrobal(el)%deltas  = 0.0_rkind
 
     end do
-  end subroutine compute_all
+  end subroutine update_storage_odes
 
+
+  subroutine compute_all()
+    integer(kind=ikind) :: t
+
+    do t = 1, n_steps
+      call update_storage_odes(t)
+      call route_step(t)
+    end do
+
+    print *, "DEBUG after compute:"
+    print *, "Pm(1,49)  = ", Pm(1,49)
+    print *, "Pm(1,72)  = ", Pm(1,72)
+    print *, "Pm(1,240) = ", Pm(1,240)
+
+  end subroutine compute_all
 
 end module solver

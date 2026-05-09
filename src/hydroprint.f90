@@ -99,32 +99,28 @@ module hydroprint
   !==============================================================
   !  Print element balance
   !==============================================================
-  subroutine print_element_balance(tstep)
-    integer(kind=ikind), intent(in) :: tstep
-    integer(kind=ikind) :: i
-    real(kind=rkind)    :: surplus
+  subroutine print_water_balance(tstep)
+  integer(kind=ikind), intent(in) :: tstep
+  integer(kind=ikind) :: i
 
-    if (.not. allocated(elements%hydrobal)) then
-      print *, "No hydrological data to display."
-      return
-    end if
+  print *
+  print *, "=================================================================================================================="
+  write(*,'(A,I6)') "WATER BALANCE AT TIME STEP = ", tstep
+  print *, "=================================================================================================================="
+  print *, "Elem        Pm         If         E       Qsurf         Tv       Qsub         Rv        Qgw " // &
+           "     dVsurf       dVsub        dVgw      Ssurf       Ssub        Sgw"
+  print *, "=================================================================================================================="
 
-    print *, "----------------------------------------------------------------------------------------------------------------"
-    print *, " Element |     P        ET      Qsurf       Li       Qgw      Qin     Surplus   Qout_elem  Overflow    deltaS"
-    print *, "----------------------------------------------------------------------------------------------------------------"
+  do i = 1, elements%kolik
+    write(*,'(I4,1X,14(ES11.3,1X))') i, &
+         Pm(i,tstep), If_m(i,tstep), E_m(i,tstep), Qsurf_m(i,tstep), &
+         Tv_m(i,tstep), Qsub_m(i,tstep), Rv_m(i,tstep), Qgw_m(i,tstep), &
+         dVsurf(i,tstep), dVsub(i,tstep), dVgw(i,tstep), &
+         Ssurf_hist(i,tstep), Ssub_hist(i,tstep), Sgw_hist(i,tstep)
+  end do
 
-    do i = 1_ikind, elements%kolik
-      surplus = elements%hydrobal(i)%Qsurf + &
-                elements%hydrobal(i)%Li    + &
-                elements%hydrobal(i)%Qgw
-
-      print *, i, precip(i,tstep), elements%hydrobal(i)%ET, &
-               elements%hydrobal(i)%Qsurf, elements%hydrobal(i)%Li, &
-               elements%hydrobal(i)%Qgw, elements%hydrobal(i)%inflow, &
-               surplus, elements%hydrobal(i)%outflow, &
-               elements%overflow(i), elements%hydrobal(i)%deltas
-    end do
-  end subroutine print_element_balance
+  print *, "=================================================================================================================="
+ end subroutine print_water_balance
 
 
   !==============================================================
@@ -158,5 +154,6 @@ module hydroprint
     print *, "Element balances saved to: ", trim(filename)
   end subroutine export_element_balance
 
+  
 
 end module hydroprint

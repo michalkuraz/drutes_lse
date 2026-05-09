@@ -22,6 +22,7 @@ contains
   pure real(kind=rkind) function psychro_const(z_elev)
     real(kind=rkind), intent(in) :: z_elev
     real(kind=rkind) :: P
+
     P = 101.3_rkind * ((293.0_rkind - 0.0065_rkind * z_elev) / 293.0_rkind)**5.26_rkind
     psychro_const = 0.000665_rkind * P
   end function psychro_const
@@ -59,53 +60,55 @@ contains
       ratio = 0.0_rkind
     end if
 
-    Rnl_daily = sigma * tmp * (0.34_rkind - 0.14_rkind * sqrt(max(ea, 0.0_rkind))) * &
+    Rnl_daily = sigma * tmp * &
+                (0.34_rkind - 0.14_rkind * sqrt(max(ea, 0.0_rkind))) * &
                 (1.35_rkind * ratio - 0.35_rkind)
   end function Rnl_daily
 
 
   !==============================================================
-  !  Penman Monteith function for ET estimation
+  ! Penman-Monteith reference ET [mm/day]
   !==============================================================
-  pure real(kind=rkind) function penman_monteith(element, tstep)
+  real(kind=rkind) function penman_monteith(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
+
     integer(kind=ikind) :: jday
     real(kind=rkind) :: es_Tmax, es_Tmin, es, ea
     real(kind=rkind) :: delta, gamma, u2, Ra, Rs, Rso
     real(kind=rkind) :: Rns, Rnl, Rn, G0
     real(kind=rkind) :: L1, L2, L3, L4, nN
 
-    jday = Julian_day + int((real(tstep - 1, rkind)) * dt_days, kind=ikind)
+    jday = Julian_day + int(real(tstep - 1, rkind) * dt_days, kind=ikind)
 
     es_Tmax = esat(Tmax(element, tstep))
     es_Tmin = esat(Tmin(element, tstep))
+    es      = 0.5_rkind * (es_Tmax + es_Tmin)
 
-    es = 0.5_rkind * (es_Tmax + es_Tmin)
-
-    ea = (es_Tmin * RHmax(element, tstep) + es_Tmax * RHmin(element, tstep)) / 200.0_rkind
+    ea = (es_Tmin * RHmax(element, tstep) + &
+          es_Tmax * RHmin(element, tstep)) / 200.0_rkind
 
     delta = slope_vp(Tmean(element, tstep))
     gamma = psychro_const(z)
-
-    u2 = wind2m(uz(element, tstep), z)
+    u2    = wind2m(uz(element, tstep), z)
 
     Ra = Ra_daily(phi, jday)
 
-    nN = 1.0_rkind
+    nN  = 1.0_rkind
     Rs  = (as + bs * nN) * Ra
     Rso = (0.75_rkind + 2.0e-5_rkind * z) * Ra
 
     Rns = (1.0_rkind - alpha) * Rs
 
     Rnl = Rnl_daily(Tmax(element, tstep) + 273.16_rkind, &
-                    Tmin(element, tstep) + 273.16_rkind, ea, Rs, Rso)
+                    Tmin(element, tstep) + 273.16_rkind, &
+                    ea, Rs, Rso)
 
     Rn = max(Rns - Rnl, 0.0_rkind)
-
     G0 = G(element)
 
     L1 = 0.408_rkind * delta * (Rn - G0)
-    L2 = gamma * (900.0_rkind / (Tmean(element, tstep) + 273.0_rkind)) * u2 * (es - ea)
+    L2 = gamma * (900.0_rkind / (Tmean(element, tstep) + 273.0_rkind)) * &
+         u2 * (es - ea)
     L3 = L1 + L2
     L4 = delta + gamma * (1.0_rkind + 0.34_rkind * u2)
 
@@ -118,42 +121,227 @@ contains
 
 
   !==============================================================
-  !  Surface runoff using SCS-CN method
+  ! Effective saturation factor [-]
   !==============================================================
-  pure real(kind=rkind) function surface_runoff(element, tstep)
-    integer(kind=ikind), intent(in) :: element, tstep
-    real(kind=rkind) :: S, I
+  real(kind=rkind) function theta_effective(theta)
+    real(kind=rkind), intent(in) :: theta
 
-    S = (25400.0_rkind / real(CN, rkind)) - 254.0_rkind
-    I = 0.2_rkind * S
-
-    if (precip(element, tstep) <= I) then
-      surface_runoff = 0.0_rkind
+    if (theta_s > theta_r) then
+      theta_effective = (theta - theta_r) / (theta_s - theta_r)
+      theta_effective = max(0.0_rkind, min(1.0_rkind, theta_effective))
     else
-      surface_runoff = (precip(element, tstep) - I)**2 / &
-                       (precip(element, tstep) - I + S)
+      theta_effective = 1.0_rkind
     end if
-  end function surface_runoff
+  end function theta_effective
 
 
   !==============================================================
-  !  Ground water function
+  ! Unsaturated surface hydraulic conductivity [m/s]
   !==============================================================
-  pure real(kind=rkind) function ground_water(element, tstep)
+  real(kind=rkind) function ksurf_unsat(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
-    ground_water = conduct(element) * soilcontent(element, tstep)
+
+    ksurf_unsat = Ksat_surf(element) * &
+                  theta_effective(soilcontent(element,tstep))**ksurf_exp
+  end function ksurf_unsat
+
+
+  !==============================================================
+  ! Unsaturated subsurface hydraulic conductivity [m/s]
+  !==============================================================
+  real(kind=rkind) function ksub_unsat(element, tstep)
+    integer(kind=ikind), intent(in) :: element, tstep
+
+    ksub_unsat = Ksat_sub(element) * &
+                 theta_effective(soilcontent(element,tstep))**ksub_exp
+  end function ksub_unsat
+
+
+  !==============================================================
+  ! Soil-moisture reduction factor for infiltration [-]
+  ! High moisture -> lower infiltration capacity
+  !==============================================================
+  real(kind=rkind) function infil_moisture_factor(theta)
+    real(kind=rkind), intent(in) :: theta
+
+    if (theta_s > theta_r) then
+      infil_moisture_factor = (theta_s - theta) / (theta_s - theta_r)
+      infil_moisture_factor = max(0.0_rkind, min(1.0_rkind, infil_moisture_factor))
+    else
+      infil_moisture_factor = 1.0_rkind
+    end if
+  end function infil_moisture_factor
+
+
+  !==============================================================
+  ! Slope reduction factor for infiltration [-]
+  ! Steeper slope -> lower infiltration opportunity
+  !==============================================================
+  real(kind=rkind) function infil_slope_factor(element)
+    integer(kind=ikind), intent(in) :: element
+
+    infil_slope_factor = 1.0_rkind / &
+         (1.0_rkind + infil_slope_coeff * max(elements%slope(element), 0.0_rkind))
+  end function infil_slope_factor
+
+
+  !==============================================================
+  ! Slope-adjusted Curve Number [-]
+  !==============================================================
+  real(kind=rkind) function effective_cn(element)
+    integer(kind=ikind), intent(in) :: element
+    real(kind=rkind) :: slope_pct
+
+    slope_pct = 100.0_rkind * max(elements%slope(element), 0.0_rkind)
+
+    effective_cn = real(CN, rkind) + cn_slope_coeff * slope_pct
+    effective_cn = min(98.0_rkind, max(30.0_rkind, effective_cn))
+  end function effective_cn
+
+
+  !==============================================================
+  ! Surface runoff using slope-adjusted SCS-CN [mm/timestep]
+  !==============================================================
+  real(kind=rkind) function qsurf_m_step(element, tstep)
+    integer(kind=ikind), intent(in) :: element, tstep
+    real(kind=rkind) :: CN_eff, S, Ia, Pstep_mm, denom
+
+    CN_eff = effective_cn(element)
+
+    if (CN_eff <= 0.0_rkind) then
+      qsurf_m_step = 0.0_rkind
+      return
+    end if
+
+    Pstep_mm = max(0.0_rkind, precip(element,tstep))
+
+    S  = (25400.0_rkind / CN_eff) - 254.0_rkind
+    Ia = 0.2_rkind * S
+
+    if (S <= 0.0_rkind .or. Pstep_mm <= Ia) then
+      qsurf_m_step = 0.0_rkind
+    else
+      denom = Pstep_mm - Ia + S
+      if (denom <= 0.0_rkind) then
+        qsurf_m_step = 0.0_rkind
+      else
+        qsurf_m_step = ((Pstep_mm - Ia)**2 / denom)
+      end if
+    end if
+  end function qsurf_m_step
+
+
+  !==============================================================
+  ! Precipitation [mm/timestep]
+  !==============================================================
+  real(kind=rkind) function precip_m_step(element, tstep)
+    integer(kind=ikind), intent(in) :: element, tstep
+
+    precip_m_step = precip(element,tstep)
+  end function precip_m_step
+
+
+  !==============================================================
+  ! Infiltration [mm/timestep]
+  ! Uses unsaturated surface K, moisture factor, and slope factor
+  !==============================================================
+  real(kind=rkind) function infiltration(element, tstep)
+    integer(kind=ikind), intent(in) :: element, tstep
+    real(kind=rkind) :: cap
+
+    cap = ksurf_unsat(element,tstep) * 1000.0_rkind * dt_seconds * &
+          infil_moisture_factor(soilcontent(element,tstep)) * &
+          infil_slope_factor(element)
+
+    infiltration = min(precip_m_step(element,tstep), max(0.0_rkind, cap))
+  end function infiltration
+
+
+  real(kind=rkind) function infil_m_step(element, tstep)
+    integer(kind=ikind), intent(in) :: element, tstep
+
+    infil_m_step = infiltration(element,tstep)
+  end function infil_m_step
+
+
+  !==============================================================
+  ! Actual ET [mm/timestep]
+  ! ET = ETref * crop coefficient * f(theta)
+  ! Slope affects ET indirectly through theta/storage
+  !==============================================================
+  real(kind=rkind) function evap_m_step(element, tstep)
+    integer(kind=ikind), intent(in) :: element, tstep
+
+    evap_m_step = penman_monteith(element,tstep) * ccrop * &
+                  theta_effective(soilcontent(element,tstep)) * dt_days
+  end function evap_m_step
+
+
+  !==============================================================
+  ! Tv: vadose-zone transpiration / lateral loss [mm/timestep]
+  ! Unsaturated and slope-dependent, as requested
+  !==============================================================
+  real(kind=rkind) function tv_m_step(element, tstep)
+    integer(kind=ikind), intent(in) :: element, tstep
+
+    tv_m_step = 0.25_rkind * ksub_unsat(element,tstep) * &
+                1000.0_rkind * dt_seconds * &
+                (1.0_rkind + max(elements%slope(element), 0.0_rkind))
+  end function tv_m_step
+
+
+  !==============================================================
+  ! Qsub: lateral subsurface/vadose discharge [mm/timestep]
+  ! Unsaturated and slope-dependent
+  !==============================================================
+  real(kind=rkind) function qsub_m_step(element, tstep)
+    integer(kind=ikind), intent(in) :: element, tstep
+
+    qsub_m_step = ksub_unsat(element,tstep) * 1000.0_rkind * dt_seconds * &
+                  max(elements%slope(element), 0.0_rkind)
+  end function qsub_m_step
+
+
+  !==============================================================
+  ! Rv: recharge to groundwater [mm/timestep]
+  ! Saturated and slope-dependent, as requested
+  !==============================================================
+  real(kind=rkind) function rv_m_step(element, tstep)
+    integer(kind=ikind), intent(in) :: element, tstep
+
+    rv_m_step = 0.50_rkind * Ksat_gw(element) * &
+                1000.0_rkind * dt_seconds * &
+                (1.0_rkind + max(elements%slope(element), 0.0_rkind))
+  end function rv_m_step
+
+
+  !==============================================================
+  ! Groundwater discharge with slope effect [mm/timestep]
+  ! Saturated groundwater K
+  !==============================================================
+  real(kind=rkind) function ground_water(element, tstep)
+    integer(kind=ikind), intent(in) :: element, tstep
+
+    ground_water = Ksat_gw(element) * 1000.0_rkind * dt_seconds * &
+                   soilcontent(element,tstep) * &
+                   (1.0_rkind + qgw_slope_coeff * max(elements%slope(element), 0.0_rkind))
   end function ground_water
 
 
-  !==============================================================
-  !  Leakage function
-  !==============================================================
-  pure real(kind=rkind) function leakage(element, tstep)
+  real(kind=rkind) function qgw_m_step(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
-    leakage = max(0.0_rkind, qinter(element, tstep) + precip(element, tstep) - &
-                              ET_flux(element, tstep) - Qsurf_result(element, tstep))
+
+    qgw_m_step = ground_water(element,tstep)
+  end function qgw_m_step
+
+
+  !==============================================================
+  ! Leakage / percolation diagnostic [mm/timestep]
+  !==============================================================
+  real(kind=rkind) function leakage(element, tstep)
+    integer(kind=ikind), intent(in) :: element, tstep
+
+    leakage =  infiltration(element,tstep)
   end function leakage
 
-
- 
 end module hydrofnc

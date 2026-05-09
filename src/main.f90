@@ -8,110 +8,167 @@ program nour
   use hydrotools
   use hydroprint
   use solver
-    implicit none
+  implicit none
 
-   integer(kind=ikind) :: i, nc,t
-   integer :: unit
-   character(len=256)  :: mesh_file_name
-   logical             :: file_exists
-   real(kind=rkind)    :: surplus
-   real(kind=rkind)    :: qout_catch   ! catchment outflow part from this element
-
-
-
+  integer(kind=ikind) :: i, t
+  integer :: unit, ios
+  character(len=256) :: mesh_file_name
 
   mesh_file_name = "mesh.txt"
 
 
 
   ! ----------------------------------------------------
-  ! 1) Read mesh & compute geometry
+  ! 1) Read mesh and compute geometry
   ! ----------------------------------------------------
-  call read_mesh(mesh_file_name)   ! from tools
-  call compute_areas()             ! from tools
-  call compute_avgalt()            ! from tools
+  call read_mesh(mesh_file_name)
+  call compute_areas()
+  call compute_avgalt()
 
+  print *, "-----------------------------------------------"
+  print *, "Mesh diagnostics"
+  print *, "nodes%kolik    = ", nodes%kolik
+  print *, "elements%kolik = ", elements%kolik
+
+  if (allocated(nodes%data)) then
+    print *, "nodes%data size = ", size(nodes%data,1), size(nodes%data,2)
+  else
+    print *, "ERROR: nodes%data is not allocated"
+  end if
+
+  if (allocated(nodes%altitude)) then
+    print *, "nodes%altitude size = ", size(nodes%altitude)
+  else
+    print *, "ERROR: nodes%altitude is not allocated"
+  end if
+
+  if (allocated(elements%area)) then
+    print *, "elements%area size = ", size(elements%area)
+  else
+    print *, "ERROR: elements%area is not allocated"
+  end if
+
+  print *, "-----------------------------------------------"
+  print *, "Node Coordinates"
+
+  do i = 1, nodes%kolik
+    print *, "Node", i, "x=", nodes%data(i,1), "y=", nodes%data(i,2), &
+             "z=", nodes%altitude(i)
+  end do
+
+  print *, "-----------------------------------------------"
+  print *, "Element Areas and average altitude"
+
+  do i = 1, elements%kolik
+    print *, "Element", i, "area=", elements%area(i), &
+             "avg z=", elements%avgalt(i)
+  end do
 
   ! ----------------------------------------------------
-  ! 2) Flow topology (neighbours, downstream, order)
+  ! 2) Flow topology
   ! ----------------------------------------------------
   drutes_config%dimen = 2
-  call init_flow_topology()          !from tools
-  call print_graph_diagnostics()     ! from tools
+  call init_flow_topology()
+  call print_graph_diagnostics()
+
+  print *, "n_steps  = ", n_steps
+  print *, "dt_hours = ", dt_hours
+  print *, "dt_days  = ", dt_days
+
+  ! ----------------------------------------------------
+  ! 3) Initialize hydrology
+  ! ----------------------------------------------------
+  call init_hydro()
+
+
+  ! ----------------------------------------------------
+  ! 4) Compute water balance and routing
+  ! ----------------------------------------------------
+  call compute_all()
+
   
 
+  ! Print upstream flows only daily
+  do t = 1, n_steps
+    if (mod(t,24) == 0) then
+      call print_upstream_flows(t)
+    end if
+  end do
 
   ! ----------------------------------------------------
-   ! 3) Initialize hydrological inputs and parameters
-  !     (from your initvals module)
-  ! ---------------------------------------------------
-  call init_hydro()    ! from tools
+  ! 5) Export full ODE water balance
+  ! ----------------------------------------------------
+  open(newunit=unit, file="water_balance_detailed.csv", status="replace", &
+       action="write", iostat=ios)
 
-    
-  ! ----------------------------------------------------
-  ! 4) Compute hydrological balance + routing
-  ! ----------------------------------------------------
-  call compute_all()       ! from hydrofunction
+  if (ios /= 0) then
+    print *, "ERROR: cannot open water_balance_detailed.csv. IOSTAT=", ios
+    stop
+  end if
+
+  write(unit,'(A)') &
+    "step,element,Pm,If_m,E_m,Qsurf_m,Tv_m,Qsub_m,Rv_m,Qgw_m," // &
+    "dVsurf_m3,dVsub_m3,dVgw_m3,Ssurf_m3,Ssub_m3,Sgw_m3"
 
   do t = 1, n_steps
-   call print_upstream_flows(t)
-  end do    ! from tools
-
-  ! ----------------------------------------------------
-  ! 5) Print and export results
-  ! ----------------------------------------------------
-    print *, "--------------------------------------------------------------------------------"
-print *, " Step Elem     P       ET      Qsurf      Li       Qgw       Qin"
-print *, "           Qout   Overflow   Storage   deltaS"
-print *, "--------------------------------------------------------------------------------"
-
-do t = 1, n_steps
-  print *, " "
-  print *, "==================== TIME STEP ", t, " ===================="
-
-  do i = 1, elements%kolik
-     print *, t, i, &
-              precip(i,t), ET_flux(i,t), Qsurf_result(i,t), &
-              L_result(i,t), Qgw_result(i,t), Qin_result(i,t), &
-              Qout_result(i,t), Overflow_result(i,t), &
-              Storage_result(i,t), deltas(i,t)
-  end do
-end do
-
- call export_element_balance("element_balance.csv")    ! from tools
-
-  print *, "-----------------------------------------------"
-  print *, " Element |  z_avg   Qsurf_local"
-  do i = 1, elements%kolik
-   print *, i, elements%avgalt(i), Qsurf_result(i,n_steps)
-  end do
-
-  
-
-
-  print *, "-----------------------------------------------"
-print *, " Catchment outlet hydrograph"
-print *, " Step    Q_out(mm/step)    Q_out(m3/s)"
-
-    do t = 1, n_steps
-      print *, t, outlet_Q(t), outlet_Q_m3s(t)
+    do i = 1, elements%kolik
+      write(unit,'(I6,",",I6,14(",",ES16.8))') &
+        t, i, &
+        Pm(i,t), If_m(i,t), E_m(i,t), Qsurf_m(i,t), &
+        Tv_m(i,t), Qsub_m(i,t), Rv_m(i,t), Qgw_m(i,t), &
+        dVsurf(i,t), dVsub(i,t), dVgw(i,t), &
+        Ssurf_hist(i,t), Ssub_hist(i,t), Sgw_hist(i,t)
     end do
-    ! Export outlet hydrograph to CSV
-  open(newunit=unit, file="outlet_hydrograph.csv", status="replace", action="write")
-   write(unit,'(A)') "step,Q_out_mm_per_step,Q_out_m3s"
-
-   
+  end do
 
   close(unit)
-  print *, "Outlet hydrograph saved to: outlet_hydrograph.csv"
+  print *, "Detailed water balance saved to: water_balance_detailed.csv"
 
-  
+  ! ----------------------------------------------------
+  ! 6) Export storage only
+  ! ----------------------------------------------------
+  open(newunit=unit, file="storage_balance.csv", status="replace", &
+       action="write", iostat=ios)
 
+  if (ios /= 0) then
+    print *, "ERROR: cannot open storage_balance.csv. IOSTAT=", ios
+    stop
+  end if
 
+  write(unit,'(A)') "step,element,Ssurf_m3,Ssub_m3,Sgw_m3"
 
+  do t = 1, n_steps
+    do i = 1, elements%kolik
+      write(unit,'(I6,",",I6,3(",",ES16.8))') &
+        t, i, Ssurf_hist(i,t), Ssub_hist(i,t), Sgw_hist(i,t)
+    end do
+  end do
+
+  close(unit)
+  print *, "Storage balance saved to: storage_balance.csv"
+
+  ! ----------------------------------------------------
+  ! 7) Export routing balance
+  ! ----------------------------------------------------
+  call export_element_balance("element_balance.csv")
+
+  ! ----------------------------------------------------
+  ! 8) Print daily readable summaries
+  ! ----------------------------------------------------
+  do t = 1, n_steps
+    if (mod(t,24) == 0) then
+      call print_water_balance(t)
+    end if
+  end do
 
   print *, "-----------------------------------------------"
-  print *, "   Model run completed successfully."
-  print *, "   Element balance results saved to element_balance.csv"
+  print *, "Model run completed successfully."
+  print *, "Time step [hours] = ", dt_hours
+  print *, "Number of steps   = ", n_steps
+  print *, "Results saved to:"
+  print *, "  water_balance_detailed.csv"
+  print *, "  storage_balance.csv"
+  print *, "  element_balance.csv"
+  print *, "-----------------------------------------------"
 
 end program nour

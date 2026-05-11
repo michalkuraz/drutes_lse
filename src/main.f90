@@ -106,13 +106,13 @@ program nour
     stop
   end if
 
-  write(unit,'(A)') &
+  print*, &
     "step,element,Pm,If_m,E_m,Qsurf_m,Tv_m,Qsub_m,Rv_m,Qgw_m," // &
     "dVsurf_m3,dVsub_m3,dVgw_m3,Ssurf_m3,Ssub_m3,Sgw_m3"
 
   do t = 1, n_steps
     do i = 1, elements%kolik
-      write(unit,'(I6,",",I6,14(",",ES16.8))') &
+      print*, &
         t, i, &
         Pm(i,t), If_m(i,t), E_m(i,t), Qsurf_m(i,t), &
         Tv_m(i,t), Qsub_m(i,t), Rv_m(i,t), Qgw_m(i,t), &
@@ -139,7 +139,7 @@ program nour
 
   do t = 1, n_steps
     do i = 1, elements%kolik
-      write(unit,'(I6,",",I6,3(",",ES16.8))') &
+      print*, &
         t, i, Ssurf_hist(i,t), Ssub_hist(i,t), Sgw_hist(i,t)
     end do
   end do

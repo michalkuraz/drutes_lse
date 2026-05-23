@@ -101,13 +101,13 @@ module globals
   integer, parameter :: terminal = 6
 
 
-  ! NEW: upstream connectivity
-  !integer(kind=ikind), allocatable :: upstream_count(:)
-  !integer(kind=ikind), allocatable :: upstream_list(:,:)
+   !NEW: upstream connectivity
+  integer(kind=ikind), allocatable :: upstream_count(:)
+  integer(kind=ikind), allocatable :: upstream_list(:,:)
 
-! store routing values
-  !real(kind=rkind), allocatable :: Qin_result(:,:), Qout_result(:,:), &
-                               !  Overflow_result(:,:), Storage_result(:,:)
+   !store routing values
+  real(kind=rkind), allocatable :: Qin_result(:,:), Qout_result(:,:), &
+                                Overflow_result(:,:), Storage_result(:,:)
 
   real(kind=rkind), allocatable :: outlet_Q_m3s(:)
 

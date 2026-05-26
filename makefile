@@ -6,7 +6,7 @@ FFLAGS = -fimplicit-none  -fcoarray=single -fbounds-check -fbacktrace -g -g3 -fd
 FFLAGS += -Werror=line-truncation
 
 OBJS = typy.o globals.o core_tools.o debug_tools.o readtools.o printtools.o tools.o \
-     hydrofnc.o hydrotools.o routing.o solver.o hydroprint.o main.o
+     hydrofnc.o hydrotools.o routing.o solver.o hydroprint.o smartarray.o main.o
 
 TARGET = nour_model
 
@@ -18,7 +18,10 @@ $(TARGET): $(OBJS)
 typy.o: src/typy.f90
 	$(FC) $(FFLAGS) -c src/typy.f90
 	
-globals.o: src/globals.f90 typy.o
+smartarray.o: typy.o src/smartarray.f90
+	$(FC) $(FFLAGS) -c src/smartarray.f90
+	
+globals.o: src/globals.f90 typy.o smartarray.o
 	$(FC) $(FFLAGS) -c src/globals.f90
 
 core_tools.o: src/core_tools.f90 typy.o globals.o

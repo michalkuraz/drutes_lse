@@ -1,6 +1,7 @@
 ! globals.f90
 module globals
   use typy
+  use smartarray
   implicit none
 
  
@@ -99,6 +100,10 @@ module globals
                                    Inf_result(:,:), L_result(:,:), Qgw_result(:,:), deltas(:,:)
 
   integer, parameter :: terminal = 6
+  
+  type(smartarray_real) :: timestamps
+  !> should be allocated to the number of elements, add whatever is needed
+  type(smartarray_real), dimension(:), allocatable :: Qrouted, cell_storage
 
 
    !NEW: upstream connectivity

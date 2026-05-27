@@ -30,7 +30,7 @@ core_tools.o: src/core_tools.f90 typy.o globals.o
 debug_tools.o: src/debug_tools.f90 typy.o globals.o core_tools.o
 	$(FC) $(FFLAGS) -c src/debug_tools.f90
 
-readtools.o: src/readtools.f90 typy.o globals.o core_tools.o debug_tools.o
+readtools.o: src/readtools.f90 typy.o globals.o core_tools.o smartarray.o debug_tools.o
 	$(FC) $(FFLAGS) -c src/readtools.f90
 
 printtools.o: src/printtools.f90 typy.o globals.o core_tools.o debug_tools.o

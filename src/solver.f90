@@ -12,58 +12,38 @@ contains
   subroutine update_storage_odes(tstep)
     integer(kind=ikind), intent(in) :: tstep
     integer(kind=ikind) :: el
-    real(kind=rkind) :: Ai, Ssub_mm, Sgw_mm
 
     do el = 1, elements%kolik
-
-      Ai = elements%area(el)
 
       ! ----------------------------------------------------
       ! All fluxes here are mm per timestep
       ! ----------------------------------------------------
-     Pm(el,tstep)      = precip_m_step(el,tstep)
-     E_m(el,tstep)     = evap_m_step(el,tstep)
-     If_m(el,tstep)    = min(infil_m_step(el,tstep), Pm(el,tstep))
-     Qsurf_m(el,tstep) = qsurf_m_step(el,tstep)
+      Pm(el,tstep)      = precip_m_step(el,tstep)
+      E_m(el,tstep)     = evap_m_step(el,tstep)
+      If_m(el,tstep)    = infil_m_step(el,tstep)
+      Qsurf_m(el,tstep) = qsurf_m_step(el,tstep)
+      q2(el,tstep)      = q2_m_step(el,tstep)
+      q3(el,tstep)      = q3_m_step(el,tstep)
+      pc(el,tstep)      = pc_m_step(el,tstep)
+      bf(el,tstep)      = bf_m_step(el,tstep)
 
-    ! Convert current storages to mm
-     Ssub_mm = Ssub(el) / Ai * 1000.0_rkind
-     Sgw_mm  = Sgw(el)  / Ai * 1000.0_rkind
-
-    ! Add this-step infiltration to available subsurface water
-      Ssub_mm = Ssub_mm + If_m(el,tstep)
-
-    ! Use small fractions per timestep, not the full potential
-      Tv_m(el,tstep)   = min(0.02_rkind * Ssub_mm, Ssub_mm)
-      Qsub_m(el,tstep) = min(0.05_rkind * Ssub_mm, Ssub_mm - Tv_m(el,tstep))
-      Rv_m(el,tstep)   = min(0.03_rkind * Ssub_mm, Ssub_mm - Tv_m(el,tstep) - Qsub_m(el,tstep))
-
-    ! Groundwater receives recharge, then discharges slowly
-      Sgw_mm = Sgw_mm + Rv_m(el,tstep)
-      Qgw_m(el,tstep) = min(0.02_rkind * Sgw_mm, Sgw_mm)
+      ! Optional aliases used by older output/routing code
+      inf(el,tstep)     = If_m(el,tstep)
+      Qsub_m(el,tstep)  = q2(el,tstep) + q3(el,tstep)
+      Qgw_m(el,tstep)   = bf(el,tstep)
 
       ! ----------------------------------------------------
-      ! Storage increments in m3
-      ! depth mm -> m by /1000
+      ! Storage increments as equivalent depth [mm/timestep]
       ! ----------------------------------------------------
-      dVsurf(el,tstep) = (Pm(el,tstep) - If_m(el,tstep) - &
-                          E_m(el,tstep) - Qsurf_m(el,tstep)) / &
-                          1000.0_rkind * Ai
+      dVsurf(el,tstep) = Pm(el,tstep) - If_m(el,tstep) - &
+                         E_m(el,tstep) - Qsurf_m(el,tstep)
 
-      dVsub(el,tstep) = (If_m(el,tstep) - Tv_m(el,tstep) - &
-                         Qsub_m(el,tstep) - Rv_m(el,tstep)) / &
-                         1000.0_rkind * Ai
+      dVsub(el,tstep)  = If_m(el,tstep) - q2(el,tstep) - &
+                         q3(el,tstep) - pc(el,tstep)
 
-      dVgw(el,tstep) = (Rv_m(el,tstep) - Qgw_m(el,tstep)) / &
-                       1000.0_rkind * Ai
+      dVgw(el,tstep)   = pc(el,tstep) - bf(el,tstep)
 
-      Ssurf(el) = max(0.0_rkind, Ssurf(el) + dVsurf(el,tstep))
-      Ssub(el)  = max(0.0_rkind, Ssub(el)  + dVsub(el,tstep))
-      Sgw(el)   = max(0.0_rkind, Sgw(el)   + dVgw(el,tstep))
-
-      Ssurf_hist(el,tstep) = Ssurf(el)
-      Ssub_hist(el,tstep)  = Ssub(el)
-      Sgw_hist(el,tstep)   = Sgw(el)
+      dv_total = dVsurf(el,tstep) + dVsub(el,tstep) + dVgw(el,tstep)
 
       ! ----------------------------------------------------
       ! Routing variables: mm per timestep
@@ -73,12 +53,13 @@ contains
       Qsurf_result(el,tstep) = Qsurf_m(el,tstep)
       Qgw_result(el,tstep)   = Qgw_m(el,tstep)
 
-       L_result(el,tstep) = If_m(el,tstep)
-
       elements%hydrobal(el)%ET    = ET_flux(el,tstep)
       elements%hydrobal(el)%Qsurf = Qsurf_result(el,tstep)
       elements%hydrobal(el)%Qgw   = Qgw_result(el,tstep)
-      elements%hydrobal(el)%Li    = L_result(el,tstep)
+      elements%hydrobal(el)%q2    = q2(el,tstep)
+      elements%hydrobal(el)%q3    = q3(el,tstep)
+      elements%hydrobal(el)%pc    = pc(el,tstep)
+      elements%hydrobal(el)%bf    = bf(el,tstep)
 
       elements%hydrobal(el)%inflow  = 0.0_rkind
       elements%hydrobal(el)%outflow = 0.0_rkind

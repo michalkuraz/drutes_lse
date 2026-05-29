@@ -139,7 +139,7 @@ end subroutine read_mesh
      elements%hydrobal(el)%inflow  = 0.0_rkind
      elements%hydrobal(el)%outflow = 0.0_rkind
      elements%hydrobal(el)%ET      = 0.0_rkind
-     elements%hydrobal(el)%Li      = 0.0_rkind
+     !elements%hydrobal(el)%Li      = 0.0_rkind
      elements%hydrobal(el)%Qgw     = 0.0_rkind
      elements%hydrobal(el)%deltas  = 0.0_rkind
 
@@ -186,8 +186,13 @@ end subroutine mesh_allocater
 
     allocate(Qsurf_result(elements%kolik, n_steps))
     allocate(ET_flux(elements%kolik, n_steps))
-    allocate(L_result(elements%kolik, n_steps))
+    !allocate(L_result(elements%kolik, n_steps))
     allocate(Qgw_result(elements%kolik, n_steps))
+    allocate(Inf_result(elements%kolik, n_steps))
+    allocate(pc(elements%kolik, n_steps))
+    allocate(q2(elements%kolik, n_steps))
+    allocate(q3(elements%kolik, n_steps))
+    allocate(bf(elements%kolik, n_steps))
     allocate(deltas(elements%kolik, n_steps))
 
     allocate(Qin_result(elements%kolik, n_steps))
@@ -207,23 +212,24 @@ end subroutine mesh_allocater
     allocate(E_m(elements%kolik, n_steps))
     allocate(If_m(elements%kolik, n_steps))
     allocate(Qsurf_m(elements%kolik, n_steps))
-    allocate(Tv_m(elements%kolik, n_steps))
-    allocate(Qsub_m(elements%kolik, n_steps))
-    allocate(Rv_m(elements%kolik, n_steps))
-    allocate(Qgw_m(elements%kolik, n_steps))
+    !allocate(Tv_m(elements%kolik, n_steps))
+    !allocate(Qsub_m(elements%kolik, n_steps))
+    !allocate(Rv_m(elements%kolik, n_steps))
+    !allocate(Qgw_m(elements%kolik, n_steps))
 
     allocate(dVsurf(elements%kolik, n_steps))
     allocate(dVsub(elements%kolik, n_steps))
     allocate(dVgw(elements%kolik, n_steps))
 
-    allocate(Ssurf(elements%kolik))
-    allocate(Ssub(elements%kolik))
-    allocate(Sgw(elements%kolik))
 
-    allocate(Ssurf_hist(elements%kolik, n_steps))
-    allocate(Ssub_hist(elements%kolik, n_steps))
-    allocate(Sgw_hist(elements%kolik, n_steps))
-    allocate(Inf_result(elements%kolik, n_steps))
+    !allocate(Ssurf(elements%kolik))
+    !allocate(Ssub(elements%kolik))
+    !allocate(Sgw(elements%kolik))
+
+    !allocate(Ssurf_hist(elements%kolik, n_steps))
+    !allocate(Ssub_hist(elements%kolik, n_steps))
+    !allocate(Sgw_hist(elements%kolik, n_steps))
+    allocate(inf(elements%kolik, n_steps))
 
     !------------------------------------------------------------
     ! Initialize everything to zero
@@ -244,8 +250,14 @@ end subroutine mesh_allocater
 
     Qsurf_result = 0.0_rkind
     ET_flux      = 0.0_rkind
-    L_result     = 0.0_rkind
+    !L_result     = 0.0_rkind
     Qgw_result   = 0.0_rkind
+    Inf_result   = 0.0_rkind
+    pc           = 0.0_rkind
+    q2           = 0.0_rkind
+    q3           = 0.0_rkind
+    bf           = 0.0_rkind
+    storage      = 0.0_rkind
     deltas       = 0.0_rkind
 
     Qin_result      = 0.0_rkind
@@ -254,7 +266,7 @@ end subroutine mesh_allocater
     Storage_result  = 0.0_rkind
     outlet_Q_m3s    = 0.0_rkind
 
-    storage  = 0.0_rkind
+    
     capacity = 8.0_rkind
     outlet_Q = 0.0_rkind
 
@@ -271,14 +283,14 @@ end subroutine mesh_allocater
     dVsub  = 0.0_rkind
     dVgw   = 0.0_rkind
 
-    Ssurf = 0.0_rkind
-    Ssub  = 0.0_rkind
-    Sgw   = 0.0_rkind
+    !Ssurf = 0.0_rkind
+    !Ssub  = 0.0_rkind
+    !Sgw   = 0.0_rkind
 
-    Ssurf_hist = 0.0_rkind
-    Ssub_hist  = 0.0_rkind
-    Sgw_hist   = 0.0_rkind
-    Inf_result = 0.0_rkind
+    !Ssurf_hist = 0.0_rkind
+    !Ssub_hist  = 0.0_rkind
+    !Sgw_hist   = 0.0_rkind
+    inf = 0.0_rkind
 
     !------------------------------------------------------------
     ! Initialize hydrobal structure
@@ -291,6 +303,10 @@ end subroutine mesh_allocater
         elements%hydrobal(i)%ET      = 0.0_rkind
         elements%hydrobal(i)%Qgw     = 0.0_rkind
         elements%hydrobal(i)%Qsurf   = 0.0_rkind
+        elements%hydrobal(i)%q2      = 0.0_rkind
+        elements%hydrobal(i)%q3      = 0.0_rkind
+        elements%hydrobal(i)%pc      = 0.0_rkind
+        elements%hydrobal(i)%bf      = 0.0_rkind
         elements%hydrobal(i)%deltas  = 0.0_rkind
         elements%hydrobal(i)%storage = 0.0_rkind
       end do
@@ -380,6 +396,13 @@ end subroutine mesh_allocater
      min_edge_width      = 1.0e-6_rkind
      theta_r = 0.08_rkind
      theta_s = 0.42_rkind
+     Beta1 = 0.0_rkind
+     Beta2 = 0.05_rkind
+     Beta3 = 1.0_rkind
+     Beta4 = 0.03_rkind
+     Beta5 = 0.02_rkind
+     z1 = 0.0_rkind
+     z2 = 1.0_rkind
      infil_slope_coeff   = 8.0_rkind
 
     print *, "DEBUG precip(1,49) = ", precip(1,49)

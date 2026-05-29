@@ -138,12 +138,12 @@ contains
   !==============================================================
   ! Unsaturated surface hydraulic conductivity [m/s]
   !==============================================================
-  real(kind=rkind) function ksurf_unsat(element, tstep)
-    integer(kind=ikind), intent(in) :: element, tstep
+   real(kind=rkind) function ksurf_unsat(element, tstep)
+     integer(kind=ikind), intent(in) :: element, tstep
 
-    ksurf_unsat = Ksat_surf(element) * &
-                  theta_effective(soilcontent(element,tstep))**ksurf_exp
-  end function ksurf_unsat
+     ksurf_unsat = Ksat_surf(element) * &
+                   theta_effective(soilcontent(element,tstep))**ksurf_exp
+   end function ksurf_unsat
 
 
   !==============================================================
@@ -161,7 +161,7 @@ contains
   ! Soil-moisture reduction factor for infiltration [-]
   ! High moisture -> lower infiltration capacity
   !==============================================================
-  real(kind=rkind) function infil_moisture_factor(theta)
+    real(kind=rkind) function infil_moisture_factor(theta)
     real(kind=rkind), intent(in) :: theta
 
     if (theta_s > theta_r) then
@@ -177,18 +177,18 @@ contains
   ! Slope reduction factor for infiltration [-]
   ! Steeper slope -> lower infiltration opportunity
   !==============================================================
-  real(kind=rkind) function infil_slope_factor(element)
+   real(kind=rkind) function infil_slope_factor(element)
     integer(kind=ikind), intent(in) :: element
 
     infil_slope_factor = 1.0_rkind / &
          (1.0_rkind + infil_slope_coeff * max(elements%slope(element), 0.0_rkind))
-  end function infil_slope_factor
+   end function infil_slope_factor
 
 
   !==============================================================
   ! Slope-adjusted Curve Number [-]
   !==============================================================
-  real(kind=rkind) function effective_cn(element)
+    real(kind=rkind) function effective_cn(element)
     integer(kind=ikind), intent(in) :: element
     real(kind=rkind) :: slope_pct
 
@@ -196,13 +196,13 @@ contains
 
     effective_cn = real(CN, rkind) + cn_slope_coeff * slope_pct
     effective_cn = min(98.0_rkind, max(30.0_rkind, effective_cn))
-  end function effective_cn
+    end function effective_cn
 
 
   !==============================================================
   ! Surface runoff using slope-adjusted SCS-CN [mm/timestep]
   !==============================================================
-  real(kind=rkind) function qsurf_m_step(element, tstep)
+    real(kind=rkind) function qsurf_m_step(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
     real(kind=rkind) :: CN_eff, S, Ia, Pstep_mm, denom
 
@@ -228,24 +228,24 @@ contains
         qsurf_m_step = ((Pstep_mm - Ia)**2 / denom)
       end if
     end if
-  end function qsurf_m_step
+   end function qsurf_m_step
 
 
   !==============================================================
   ! Precipitation [mm/timestep]
   !==============================================================
-  real(kind=rkind) function precip_m_step(element, tstep)
+    real(kind=rkind) function precip_m_step(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
 
     precip_m_step = precip(element,tstep)
-  end function precip_m_step
+    end function precip_m_step
 
 
   !==============================================================
   ! Infiltration [mm/timestep]
   ! Uses unsaturated surface K, moisture factor, and slope factor
   !==============================================================
-  real(kind=rkind) function infiltration(element, tstep)
+    real(kind=rkind) function infiltration(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
     real(kind=rkind) :: cap
 
@@ -254,14 +254,14 @@ contains
           infil_slope_factor(element)
 
     infiltration = min(precip_m_step(element,tstep), max(0.0_rkind, cap))
-  end function infiltration
+    end function infiltration
 
 
-  real(kind=rkind) function infil_m_step(element, tstep)
+    real(kind=rkind) function infil_m_step(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
 
     infil_m_step = infiltration(element,tstep)
-  end function infil_m_step
+    end function infil_m_step
 
 
   !==============================================================
@@ -269,79 +269,90 @@ contains
   ! ET = ETref * crop coefficient * f(theta)
   ! Slope affects ET indirectly through theta/storage
   !==============================================================
-  real(kind=rkind) function evap_m_step(element, tstep)
+    real(kind=rkind) function evap_m_step(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
 
-    evap_m_step = penman_monteith(element,tstep) * ccrop * &
+    evap_m_step = penman_monteith(element,tstep)  * &
                   theta_effective(soilcontent(element,tstep)) * dt_days
-  end function evap_m_step
+    end function evap_m_step
 
 
   !==============================================================
-  ! Tv: vadose-zone transpiration / lateral loss [mm/timestep]
-  ! Unsaturated and slope-dependent, as requested
+  ! q2: Fast interflow / lateral loss [mm/timestep]
+  ! Uses previous subsurface storage increment. At t=1 there is no
+  ! previous value, so use zero.
   !==============================================================
-  real(kind=rkind) function tv_m_step(element, tstep)
+  real(kind=rkind) function q2_m_step(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
+    integer(kind=ikind) :: told
+    real(kind=rkind) :: sub_prev
 
-    tv_m_step = 0.25_rkind * ksub_unsat(element,tstep) * &
-                1000.0_rkind * dt_seconds * &
-                (1.0_rkind + max(elements%slope(element), 0.0_rkind))
-  end function tv_m_step
+    if (tstep <= 1_ikind) then
+      sub_prev = 0.0_rkind
+    else
+      told = tstep - 1_ikind
+      sub_prev = max(dVsub(element,told), 0.0_rkind)
+    end if
+
+    q2_m_step = max(infil_m_step(element,tstep)**2 + sub_prev - &
+                    Beta1 * (z2 - z1), 0.0_rkind)
+  end function q2_m_step
 
 
   !==============================================================
-  ! Qsub: lateral subsurface/vadose discharge [mm/timestep]
-  ! Unsaturated and slope-dependent
+  ! q3: Slow subsurface/lateral loss [mm/timestep]
   !==============================================================
-  real(kind=rkind) function qsub_m_step(element, tstep)
+  real(kind=rkind) function q3_m_step(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
+    integer(kind=ikind) :: told
+    real(kind=rkind) :: sub_prev
 
-    qsub_m_step = ksub_unsat(element,tstep) * 1000.0_rkind * dt_seconds * &
-                  max(elements%slope(element), 0.0_rkind)
-  end function qsub_m_step
+    if (tstep <= 1_ikind) then
+      sub_prev = 0.0_rkind
+    else
+      told = tstep - 1_ikind
+      sub_prev = max(dVsub(element,told), 0.0_rkind)
+    end if
+
+    q3_m_step = Beta2 * sub_prev**Beta3
+  end function q3_m_step
 
 
   !==============================================================
-  ! Rv: recharge to groundwater [mm/timestep]
-  ! Saturated and slope-dependent, as requested
+  ! PC: Percolation to groundwater [mm/timestep]
   !==============================================================
-  real(kind=rkind) function rv_m_step(element, tstep)
+  real(kind=rkind) function pc_m_step(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
+    integer(kind=ikind) :: told
+    real(kind=rkind) :: sub_prev
 
-    rv_m_step = 0.50_rkind * Ksat_gw(element) * &
-                1000.0_rkind * dt_seconds * &
-                (1.0_rkind + max(elements%slope(element), 0.0_rkind))
-  end function rv_m_step
+    if (tstep <= 1_ikind) then
+      sub_prev = 0.0_rkind
+    else
+      told = tstep - 1_ikind
+      sub_prev = max(dVsub(element,told), 0.0_rkind)
+    end if
+
+    pc_m_step = Beta4 * sub_prev
+  end function pc_m_step
 
 
   !==============================================================
-  ! Groundwater discharge with slope effect [mm/timestep]
-  ! Saturated groundwater K
+  ! Baseflow [mm/timestep]
   !==============================================================
-  real(kind=rkind) function ground_water(element, tstep)
+  real(kind=rkind) function bf_m_step(element, tstep)
     integer(kind=ikind), intent(in) :: element, tstep
+    integer(kind=ikind) :: told
+    real(kind=rkind) :: gw_prev
 
-    ground_water = Ksat_gw(element) * 1000.0_rkind * dt_seconds * &
-                   soilcontent(element,tstep) * &
-                   (1.0_rkind + qgw_slope_coeff * max(elements%slope(element), 0.0_rkind))
-  end function ground_water
+    if (tstep <= 1_ikind) then
+      gw_prev = 0.0_rkind
+    else
+      told = tstep - 1_ikind
+      gw_prev = max(dVgw(element,told), 0.0_rkind)
+    end if
 
-
-  real(kind=rkind) function qgw_m_step(element, tstep)
-    integer(kind=ikind), intent(in) :: element, tstep
-
-    qgw_m_step = ground_water(element,tstep)
-  end function qgw_m_step
-
-
-  !==============================================================
-  ! Leakage / percolation diagnostic [mm/timestep]
-  !==============================================================
-  real(kind=rkind) function leakage(element, tstep)
-    integer(kind=ikind), intent(in) :: element, tstep
-
-    leakage =  infiltration(element,tstep)
-  end function leakage
+    bf_m_step = Beta5 * gw_prev
+  end function bf_m_step
 
 end module hydrofnc

@@ -240,11 +240,14 @@ contains
      ! ============================================================
   ! 3. Local water balance
   ! ============================================================
-     water_available = precip(el,tstep) + qinter(el,tstep) + old_storage
+     water_available = precip(el,tstep) + old_storage
 
      losses = elements%hydrobal(el)%ET + &
-              elements%hydrobal(el)%Li + &
-              elements%hydrobal(el)%Qgw
+              elements%hydrobal(el)%qsurf + &
+              elements%hydrobal(el)%q2 + &
+              elements%hydrobal(el)%q3 + &
+               elements%hydrobal(el)%bf + &
+               elements%hydrobal(el)%pc
 
      losses = min(losses, water_available)
 

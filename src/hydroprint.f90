@@ -6,76 +6,51 @@ module hydroprint
   use hydrofnc
   use solver
   use routing
- 
+  implicit none
 
+contains
 
-  contains
-
-  !==============================================================
-  !   Print upstream flows for diagnostics
-  !==============================================================
   subroutine print_upstream_flows(tstep)
     integer(kind=ikind), intent(in) :: tstep
     integer(kind=ikind) :: nel, e, k
-    real(kind=rkind)    :: Qin_from_up
+    real(kind=rkind) :: Qin_from_up
 
     nel = elements%kolik
 
-    if (.not. allocated(Qin_result)) then
-       print *, " No routed time-series data available."
-       return
-    end if
-
-    if (.not. allocated(Qout_result)) then
-       print *, " No routed outflow time-series data available."
-       return
-    end if
-
-    if (.not. allocated(upstream_count)) then
-       print *, " Upstream graph not built yet (call init_flow_topology first)."
-       return
-    end if
-
-    if (tstep < 1_ikind .or. tstep > n_steps) then
-       print *, " Invalid time step in print_upstream_flows: ", tstep
-       return
-    end if
+    if (.not. allocated(Qin_result)) return
+    if (.not. allocated(Qout_result)) return
+    if (.not. allocated(upstream_count)) return
 
     print *, "---------------------------------------------------------------"
     print *, " Time step = ", tstep
     print *, " el | n_up | Qin_from_up    Qin(field)     Qout_elem"
     print *, "---------------------------------------------------------------"
 
-    do e = 1_ikind, nel
-       Qin_from_up = 0.0_rkind
+    do e = 1, nel
+      Qin_from_up = 0.0_rkind
 
-       if (allocated(upstream_list)) then
-          do k = 1_ikind, upstream_count(e)
-             Qin_from_up = Qin_from_up + Qout_result(upstream_list(e,k), tstep)
-          end do
-       end if
+      do k = 1, upstream_count(e)
+        Qin_from_up = Qin_from_up + Qout_result(upstream_list(e,k), tstep)
+      end do
 
-       print *, e, upstream_count(e), Qin_from_up, &
-                Qin_result(e, tstep), Qout_result(e, tstep)
+      print *, e, upstream_count(e), Qin_from_up, Qin_result(e,tstep), Qout_result(e,tstep)
     end do
-
   end subroutine print_upstream_flows
 
-  !==============================================================
-  !   Print graph diagnostics
-  !==============================================================
+
   subroutine print_graph_diagnostics()
     integer(kind=ikind) :: el, i, nb
-    real(kind=rkind)    :: width, slope, nalt
+    real(kind=rkind) :: width, slope, nalt
 
     print *, "--------------------------------------------------------------------------"
     print *, " el   nb   dir      z_el        z_nb        slope        edge_width"
     print *, "--------------------------------------------------------------------------"
 
-    do el = 1_ikind, elements%kolik
-      do i = 1_ikind, 3_ikind
+    do el = 1, elements%kolik
+      do i = 1, 3
         nb = elements%downstream(el)%els(i)
-        if (nb > 0_ikind) then
+
+        if (nb > 0) then
           width = elements%downstream(el)%widths(i)
           slope = elements%downstream(el)%slopes(i)
           nalt  = elements%avgalt(nb)
@@ -83,7 +58,8 @@ module hydroprint
         end if
 
         nb = elements%upstream(el)%els(i)
-        if (nb > 0_ikind) then
+
+        if (nb > 0) then
           width = elements%upstream(el)%widths(i)
           slope = elements%upstream(el)%slopes(i)
           nalt  = elements%avgalt(nb)
@@ -96,64 +72,59 @@ module hydroprint
   end subroutine print_graph_diagnostics
 
 
-  !==============================================================
-  !  Print element balance
-  !==============================================================
   subroutine print_water_balance(tstep)
-  integer(kind=ikind), intent(in) :: tstep
-  integer(kind=ikind) :: i
+    integer(kind=ikind), intent(in) :: tstep
+    integer(kind=ikind) :: i
 
-  print *
-  print *, "=================================================================================================================="
-  write(*,'(A,I6)') "WATER BALANCE AT TIME STEP = ", tstep
-  print *, "=================================================================================================================="
-  print *, "Elem        Pm         If         E       Qsurf         Tv       Qsub         Rv        Qgw " // &
-           "     dVsurf       dVsub        dVgw      Ssurf       Ssub        Sgw"
-  print *, "=================================================================================================================="
+    print *
+    print *, "================================================================================================="
+    write(*,'(A,I6)') "WATER BALANCE AT TIME STEP = ", tstep
+    print *, "================================================================================================="
+    print *, "Elem        P          E          If         q1         q2         q3         pc         bf" // &
+         "       dSsurf      dSsub       dSgw       total_dS    Ssurf      Ssub       Sgw"
+    print *, "================================================================================================="
 
-  do i = 1, elements%kolik
-    write(*,'(I4,1X,14(ES11.3,1X))') i, &
-         Pm(i,tstep), If_m(i,tstep), E_m(i,tstep), Qsurf_m(i,tstep), &
-         Tv_m(i,tstep), Qsub_m(i,tstep), Rv_m(i,tstep), Qgw_m(i,tstep), &
-         dVsurf(i,tstep), dVsub(i,tstep), dVgw(i,tstep), &
-         Ssurf_hist(i,tstep), Ssub_hist(i,tstep), Sgw_hist(i,tstep)
-  end do
+    do i = 1, elements%kolik
+      print*,  i, &
+        Pm(i,tstep), E_m(i,tstep), If_m(i,tstep), &
+        q1(i,tstep), q2(i,tstep), q3(i,tstep), pc(i,tstep), bf(i,tstep), &
+        dSsurf(i,tstep), dSsub(i,tstep), dSgw(i,tstep), total_deltaS(i,tstep), &
+        Ssurf_hist(i,tstep), Ssub_hist(i,tstep), Sgw_hist(i,tstep)
+    end do
 
-  print *, "=================================================================================================================="
- end subroutine print_water_balance
+    print *, "================================================================================================="
+  end subroutine print_water_balance
 
 
-  !==============================================================
-  !   EXPORT ELEMENT WATER BALANCE TO CSV
-  !==============================================================
   subroutine export_element_balance(filename)
     character(len=*), intent(in) :: filename
     integer(kind=ikind) :: i, t
     integer :: unit, ios
 
     open(newunit=unit, file=filename, status="replace", action="write", iostat=ios)
+
     if (ios /= 0) then
-       print *, "Error opening file: ", trim(filename)
-       return
+      print *, "Error opening file: ", trim(filename)
+      return
     end if
 
-    write(unit,'(A)') "step,element,area,z_avg,downstream," // &
-                      "P,ET,Qsurf,Li,Qgw,Qin,Qout,Overflow,Storage,DeltaS"
+    print*, "step,element,area,z_avg,downstream,P,E,If,q1,q2,q3,pc,bf," // &
+                  "dSsurf,dSsub,dSgw,total_dS,Ssurf,Ssub,Sgw,Qin,Qout,Overflow,Storage,deltas"
 
     do t = 1, n_steps
-       do i = 1, elements%kolik
-          write(unit,'(I4, ",", I4, ",", F10.3, ",", F10.3, ",", I4, 10(",",F12.6))') &
-               t, i, elements%area(i), elements%avgalt(i), downstream(i), &
-               precip(i,t), ET_flux(i,t), Qsurf_result(i,t), L_result(i,t), &
-               Qgw_result(i,t), Qin_result(i,t), Qout_result(i,t), &
-               Overflow_result(i,t), Storage_result(i,t), deltas(i,t)
-       end do
+      do i = 1, elements%kolik
+        print*, &
+            t, i, elements%area(i), elements%avgalt(i), downstream(i), &
+           Pm(i,t), E_m(i,t), If_m(i,t), q1(i,t), q2(i,t), q3(i,t), pc(i,t), bf(i,t), &
+           dSsurf(i,t), dSsub(i,t), dSgw(i,t), total_deltaS(i,t), &
+           Ssurf_hist(i,t), Ssub_hist(i,t), Sgw_hist(i,t), &
+           Qin_result(i,t), Qout_result(i,t), Overflow_result(i,t), &
+           Storage_result(i,t), deltas(i,t)
+      end do
     end do
 
     close(unit)
     print *, "Element balances saved to: ", trim(filename)
   end subroutine export_element_balance
-
-  
 
 end module hydroprint

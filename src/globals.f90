@@ -4,120 +4,83 @@ module globals
   use smartarray
   implicit none
 
- 
-  ! Time/progress helpers
   real(kind=rkind) :: tmp, tmp1, sim_time, start_time, end_time, time, time_step
   logical          :: www
-  
-  
 
-  ! ---------- Node structure ----------
   type :: nodes_str
-     real(kind=rkind), allocatable :: data(:,:)     ! (n_nodes,2): x,y
-     logical,       allocatable    :: watershed(:)  ! mask if needed
+     real(kind=rkind), allocatable :: data(:,:)
+     logical,       allocatable    :: watershed(:)
      integer(kind=ikind)           :: kolik = 0
-     real(kind=rkind), allocatable :: altitude(:)   ! elevation z
+     real(kind=rkind), allocatable :: altitude(:)
   end type nodes_str
-  
+
   type, public :: stream_str
     integer(kind=ikind), dimension(3) :: els = 0
-    real(kind=rkind), dimension(3) :: slopes = 0
-    real(kind=rkind), dimension(3) :: widths = 0
+    real(kind=rkind),    dimension(3) :: slopes = 0.0_rkind
+    real(kind=rkind),    dimension(3) :: widths = 0.0_rkind
   end type stream_str
 
-  ! ---------- Hydrological balance (per element, per step) ----------
   type, public :: hydrobal_str
      real(kind=rkind) :: deltas  = 0.0_rkind
      real(kind=rkind) :: inflow  = 0.0_rkind
      real(kind=rkind) :: outflow = 0.0_rkind
-     real(kind=rkind) :: Li      = 0.0_rkind
      real(kind=rkind) :: ET      = 0.0_rkind
-     real(kind=rkind) :: Qgw     = 0.0_rkind
-     real(kind=rkind) :: Qsurf   = 0.0_rkind
+     real(kind=rkind) :: q1      = 0.0_rkind
+     real(kind=rkind) :: q2      = 0.0_rkind
+     real(kind=rkind) :: q3      = 0.0_rkind
+     real(kind=rkind) :: pc      = 0.0_rkind
+     real(kind=rkind) :: bf      = 0.0_rkind
      real(kind=rkind) :: storage = 0.0_rkind
   end type hydrobal_str
 
-  ! ---------- Element structure ----------
   type :: elements_str
-     integer(kind=ikind), allocatable :: data(:,:)      ! connectivity (nel,3)
-     real(kind=rkind),    allocatable :: area(:)        ! element area
-     integer(kind=ikind), allocatable :: material(:)    ! optional soil ID
-     type(hydrobal_str),  allocatable :: hydrobal(:)    ! hydro state
-     integer(kind=ikind)              :: kolik = 0      ! number of elements
-     integer(kind=ikind), allocatable :: neighbours(:,:)! (nel,max_neigh)
-     real(kind=rkind),    allocatable :: avgalt(:)      ! mean elevation
-     real(kind=rkind),    allocatable :: slope(:)  ! local terrain slope [m/m]
-     real(kind=rkind),    allocatable :: overflow(:)    ! local generated overflow
-     type(stream_str), allocatable    :: downstream(:)
-     type(stream_str), allocatable    :: upstream(:)
-     logical, allocatable             :: outlet(:), watershed(:)
+     integer(kind=ikind), allocatable :: data(:,:)
+     real(kind=rkind),    allocatable :: area(:)
+     integer(kind=ikind), allocatable :: material(:)
+     type(hydrobal_str),  allocatable :: hydrobal(:)
+     integer(kind=ikind)              :: kolik = 0
+     integer(kind=ikind), allocatable :: neighbours(:,:)
+     real(kind=rkind),    allocatable :: avgalt(:)
+     real(kind=rkind),    allocatable :: slope(:)
+     real(kind=rkind),    allocatable :: overflow(:)
+     type(stream_str),    allocatable :: downstream(:)
+     type(stream_str),    allocatable :: upstream(:)
+     logical,             allocatable :: outlet(:), watershed(:)
      integer(kind=ikind), allocatable :: ndwatershed(:,:), ndoutlet(:,:)
   end type elements_str
 
   type(nodes_str)    :: nodes
   type(elements_str) :: elements
-  
-  
-  
-  real(kind=rkind), dimension(:), allocatable :: meteotime
-  
-  
-  
-  !type, public :: hydrodata_str
-    !> meteorological data
-   
-  ! real(kind=rkind), dimension(:), allocatable :: precip, G, Tmax, Tmin, Tmean, uz, soilwcontent, RHmax, RHmin
-    !> land cover data
-   
-  ! real(kind=rkind) :: conduct
-  
-  
-  !end type hydrodata_str
-  
-  
-  !type(hydrodata_str), dimension(:), allocatable :: hydrodata
-  
-  
 
-  ! Simulation time discretisation
-! Simulation time discretisation
+  real(kind=rkind), dimension(:), allocatable :: meteotime
+
   real(kind=rkind), parameter    :: ntot_days  = 10.0_rkind
   real(kind=rkind), parameter    :: dt_hours   = 1.0_rkind
   real(kind=rkind), parameter    :: dt_days    = dt_hours / 24.0_rkind
   real(kind=rkind), parameter    :: dt_seconds = dt_hours * 3600.0_rkind
   integer(kind=ikind), parameter :: n_steps    = int(ntot_days / dt_days)
-  integer(kind=ikind) :: CN, Julian_day 
-  real(kind=rkind) :: phi, as, bs, z, alpha, sigma, gsc, ccrop
 
-  ! Element-based hydro inputs & outputs (time series)
+  integer(kind=ikind) :: CN, Julian_day
+  real(kind=rkind)    :: phi, as, bs, z, alpha, sigma, gsc, ccrop
 
-  ! Element-based hydro inputs & outputs (time series)
   real(kind=rkind), allocatable :: precip(:,:), qinter(:,:), qout(:,:)
-  real(kind=rkind), allocatable :: conduct(:), G(:), Tmax(:,:), Tmin(:,:), Tmean(:,:)
+  real(kind=rkind), allocatable :: conduct(:), G(:)
+  real(kind=rkind), allocatable :: Tmax(:,:), Tmin(:,:), Tmean(:,:)
   real(kind=rkind), allocatable :: RHmax(:,:), RHmin(:,:), uz(:,:), soilcontent(:,:)
 
-  real(kind=rkind), allocatable :: Qsurf_result(:,:), ET_flux(:,:), &
-                                   Inf_result(:,:), L_result(:,:), Qgw_result(:,:), deltas(:,:)
+  real(kind=rkind), allocatable :: Qin_result(:,:), Qout_result(:,:)
+  real(kind=rkind), allocatable :: Overflow_result(:,:), Storage_result(:,:)
+  real(kind=rkind), allocatable :: outlet_Q_m3s(:)
+  real(kind=rkind), allocatable :: deltas(:,:)
+  real(kind=rkind), allocatable :: total_deltaS(:,:)
 
   integer, parameter :: terminal = 6
-  
+
   type(smartarray_real) :: timestamps
-  !> should be allocated to the number of elements, add whatever is needed
-  type(smartarray_real), dimension(:), allocatable :: Qrouted, cell_storage
 
-
-   !NEW: upstream connectivity
   integer(kind=ikind), allocatable :: upstream_count(:)
   integer(kind=ikind), allocatable :: upstream_list(:,:)
 
-   !store routing values
-  real(kind=rkind), allocatable :: Qin_result(:,:), Qout_result(:,:), &
-                                Overflow_result(:,:), Storage_result(:,:)
-
-  real(kind=rkind), allocatable :: outlet_Q_m3s(:)
-
-
-  ! ---------- Configuration structure (kept from DRUtES style) ----------
   type, public :: configuration
     character(len=1)    :: run_dual
     character(len=1)    :: damped_newton
@@ -136,51 +99,40 @@ module globals
 
   type(configuration), public :: drutes_config
 
-  ! ---------- New routing / storage globals ----------
-  real(kind=rkind), allocatable :: storage(:)    ! [mm] surface/depression storage
-  real(kind=rkind), allocatable :: capacity(:)   ! [mm] max local storage capacity
-  real(kind=rkind), allocatable :: outlet_Q(:)   ! [mm] outlet discharge per time step
+  real(kind=rkind), allocatable :: storage(:)
+  real(kind=rkind), allocatable :: capacity(:)
+  real(kind=rkind), allocatable :: outlet_Q(:)
 
-  integer(kind=ikind), allocatable :: downstream(:) ! downstream element ID (0 = outlet)
-  integer(kind=ikind), allocatable :: flow_order(:) ! processing order (upstream→downstream)
+  integer(kind=ikind), allocatable :: downstream(:)
+  integer(kind=ikind), allocatable :: flow_order(:)
 
+  real(kind=rkind), allocatable :: Ksat_surf(:)
+  real(kind=rkind), allocatable :: Ksat_sub(:)
+  real(kind=rkind), allocatable :: Ksat_gw(:)
 
-  ! Layer hydraulic conductivities
-  real(kind=rkind), allocatable :: Ksat_surf(:)   ! surface saturated K [m/s]
-  real(kind=rkind), allocatable :: Ksat_sub(:)    ! subsurface saturated K [m/s]
-  real(kind=rkind), allocatable :: Ksat_gw(:)     ! groundwater saturated K [m/s]
-
-  real(kind=rkind) :: ksurf_exp
-  real(kind=rkind) :: ksub_exp
-
-  real(kind=rkind) :: cn_slope_coeff
-  real(kind=rkind) :: infil_slope_coeff
-  real(kind=rkind) :: min_edge_width 
-
-  real(kind=rkind) :: qgw_slope_coeff
-  real(kind=rkind) :: storage_slope_coeff
+  real(kind=rkind) :: ksurf_exp, ksub_exp
+  real(kind=rkind) :: cn_slope_coeff, infil_slope_coeff, min_edge_width
+  real(kind=rkind) :: qgw_slope_coeff, storage_slope_coeff
   real(kind=rkind) :: theta_r, theta_s
+  real(kind=rkind) :: Beta1, Beta2, Beta3, Beta4, Beta5, z1, z2
 
-  ! Number of time steps (set in initvals)
   integer(kind=ikind) :: nsteps = 0
 
+  ! ============================================================
+  ! ODE water balance variables, all in depth units [mm]
+  ! ============================================================
 
+  ! Storages [mm]
+  real(kind=rkind), allocatable :: Ssurf(:), Ssub(:), Sgw(:)
 
-! Three-layer storages [m3]
-real(kind=rkind), allocatable :: Ssurf(:), Ssub(:), Sgw(:)
+  ! Fluxes [mm/timestep]
+  real(kind=rkind), allocatable :: Pm(:,:), E_m(:,:), If_m(:,:)
+  real(kind=rkind), allocatable :: q1(:,:), q2(:,:), q3(:,:), pc(:,:), bf(:,:)
 
-! Fluxes as depth per step [m/step]
-real(kind=rkind), allocatable :: Pm(:,:), E_m(:,:), If_m(:,:), Qsurf_m(:,:)
-real(kind=rkind), allocatable :: Tv_m(:,:), Qsub_m(:,:), Rv_m(:,:), Qgw_m(:,:)
+  ! ODE increments [mm/timestep]
+  real(kind=rkind), allocatable :: dSsurf(:,:), dSsub(:,:), dSgw(:,:)
 
-! Fluxes as volume per step [m3/step]
-real(kind=rkind), allocatable :: Pv(:,:), Ev(:,:), Ifv(:,:), Qsurfv(:,:)
-real(kind=rkind), allocatable :: Tvv(:,:), Qsubv(:,:), Rvv(:,:), Qgwv(:,:)
-
-! ODE storage increments [m3/step]
-real(kind=rkind), allocatable :: dVsurf(:,:), dVsub(:,:), dVgw(:,:)
-
-! Storage histories [m3]
-real(kind=rkind), allocatable :: Ssurf_hist(:,:), Ssub_hist(:,:), Sgw_hist(:,:)
+  ! Storage histories [mm]
+  real(kind=rkind), allocatable :: Ssurf_hist(:,:), Ssub_hist(:,:), Sgw_hist(:,:)
 
 end module globals

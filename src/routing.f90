@@ -1,15 +1,15 @@
 module routing
- use typy
- use globals
- use hydrotools
- use tools
- use hydrofnc
-  Implicit none
+  use typy
+  use globals
+  use hydrotools
+  use tools
+  use hydrofnc
+  implicit none
 
 contains
 
   !==============================================================
-  !   FLOW TOPOLOGY INITIALIZATION
+  ! FLOW TOPOLOGY INITIALIZATION
   !==============================================================
   subroutine init_flow_topology()
     integer(kind=ikind) :: nel, i
@@ -46,19 +46,14 @@ contains
       elements%upstream(i)%widths   = 0.0_rkind
     end do
 
-
     call build_graph()
     call finalize_routing_graph()
 
-
-
   end subroutine init_flow_topology
-  
-  
-  
-  
+
+
   !==============================================================
-  !   build graph
+  ! BUILD GRAPH
   !==============================================================
   subroutine build_graph()
     integer(kind=ikind) :: el, i
@@ -112,11 +107,12 @@ contains
         end if
       end do
     end do
+
   end subroutine build_graph
 
 
   !==============================================================
-  !   Convert stream candidates into routing arrays
+  ! FINALIZE ROUTING GRAPH
   !==============================================================
   subroutine finalize_routing_graph()
     integer(kind=ikind) :: nel, el, i, j, best_nb, tmp_el
@@ -129,272 +125,197 @@ contains
 
     downstream = 0_ikind
 
-    do el = 1_ikind, nel
-       best_nb    = 0_ikind
-       best_slope = 0.0_rkind
+    do el = 1, nel
+      best_nb    = 0_ikind
+      best_slope = 0.0_rkind
 
-       do i = 1_ikind, 3_ikind
-          if (elements%downstream(el)%els(i) > 0_ikind .and. &
-              elements%downstream(el)%slopes(i) > best_slope) then
-             best_nb    = elements%downstream(el)%els(i)
-             best_slope = elements%downstream(el)%slopes(i)
-          end if
-       end do
+      do i = 1, 3
+        if (elements%downstream(el)%els(i) > 0_ikind .and. &
+            elements%downstream(el)%slopes(i) > best_slope) then
+          best_nb    = elements%downstream(el)%els(i)
+          best_slope = elements%downstream(el)%slopes(i)
+        end if
+      end do
 
-       downstream(el) = best_nb
+      downstream(el) = best_nb
     end do
 
     if (allocated(upstream_count)) deallocate(upstream_count)
     if (allocated(upstream_list))  deallocate(upstream_list)
+
     allocate(upstream_count(nel))
     allocate(upstream_list(nel, nel))
 
     upstream_count = 0_ikind
     upstream_list  = 0_ikind
 
-    do el = 1_ikind, nel
-       if (downstream(el) > 0_ikind) then
-          upstream_count(downstream(el)) = upstream_count(downstream(el)) + 1_ikind
-          upstream_list(downstream(el), upstream_count(downstream(el))) = el
-       end if
+    do el = 1, nel
+      if (downstream(el) > 0_ikind) then
+        upstream_count(downstream(el)) = upstream_count(downstream(el)) + 1_ikind
+        upstream_list(downstream(el), upstream_count(downstream(el))) = el
+      end if
     end do
 
     allocate(order(nel))
     allocate(order_z(nel))
 
-    do el = 1_ikind, nel
-       order(el)   = el
-       order_z(el) = elements%avgalt(el)
+    do el = 1, nel
+      order(el)   = el
+      order_z(el) = elements%avgalt(el)
     end do
 
-    do i = 1_ikind, nel - 1_ikind
-       do j = i + 1_ikind, nel
-          if (order_z(j) > order_z(i)) then
-             tmp_z      = order_z(i)
-             order_z(i) = order_z(j)
-             order_z(j) = tmp_z
+    do i = 1, nel - 1
+      do j = i + 1, nel
+        if (order_z(j) > order_z(i)) then
+          tmp_z      = order_z(i)
+          order_z(i) = order_z(j)
+          order_z(j) = tmp_z
 
-             tmp_el   = order(i)
-             order(i) = order(j)
-             order(j) = tmp_el
-          end if
-       end do
+          tmp_el   = order(i)
+          order(i) = order(j)
+          order(j) = tmp_el
+        end if
+      end do
     end do
 
     flow_order = order
 
     deallocate(order, order_z)
+
   end subroutine finalize_routing_graph
 
 
-  
-  ! ============================================================
-  ! routing
-  ! ============================================================
-
+  !==============================================================
+  ! ROUTE SURFACE EXCESS WATER
+  !==============================================================
   subroutine route_step(tstep)
+    integer(kind=ikind), intent(in) :: tstep
 
-  integer(kind=ikind), intent(in) :: tstep
+    integer(kind=ikind) :: el, i, side, dwn
+    real(kind=rkind) :: old_storage
+    real(kind=rkind) :: water_available
+    real(kind=rkind) :: losses
+    real(kind=rkind) :: available_after_losses
+    real(kind=rkind) :: storage_capacity
+    real(kind=rkind) :: routed_water
+    real(kind=rkind) :: weight_sum
+    real(kind=rkind) :: edge_weight
+    real(kind=rkind) :: routed_fraction
+    real(kind=rkind) :: catchment_area
+    real(kind=rkind) :: outlet_volume
 
-  integer(kind=ikind) :: el, i, side, dwn
-  real(kind=rkind)    :: old_storage
-  real(kind=rkind)    :: water_available
-  real(kind=rkind)    :: losses
-  real(kind=rkind)    :: available_after_losses
-  real(kind=rkind)    :: storage_capacity
-  real(kind=rkind)    :: routed_water
-  real(kind=rkind)    :: weight_sum
-  real(kind=rkind)    :: edge_weight
-  real(kind=rkind)    :: routed_fraction
-  real(kind=rkind)    :: catchment_area
-  real(kind=rkind)    :: outlet_volume
+    real(kind=rkind), allocatable :: runoff(:)
+    real(kind=rkind), allocatable :: new_storage(:)
+    real(kind=rkind), allocatable :: local_residual(:)
+    real(kind=rkind), allocatable :: routing_residual(:)
 
-  real(kind=rkind), allocatable :: runoff(:)
-  real(kind=rkind), allocatable :: new_storage(:)
-  real(kind=rkind), allocatable :: local_residual(:)
-  real(kind=rkind), allocatable :: routing_residual(:)
+    allocate(runoff(elements%kolik))
+    allocate(new_storage(elements%kolik))
+    allocate(local_residual(elements%kolik))
+    allocate(routing_residual(elements%kolik))
 
-  allocate(runoff(elements%kolik))
-  allocate(new_storage(elements%kolik))
-  allocate(local_residual(elements%kolik))
-  allocate(routing_residual(elements%kolik))
-! ============================================================
-  ! 1. Initialization
-  ! ============================================================
+    runoff           = 0.0_rkind
+    new_storage      = storage
+    local_residual   = 0.0_rkind
+    routing_residual = 0.0_rkind
 
-  runoff           = 0.0_rkind
-  new_storage      = storage
-  local_residual   = 0.0_rkind
-  routing_residual = 0.0_rkind
+    elements%hydrobal(:)%inflow  = 0.0_rkind
+    elements%hydrobal(:)%outflow = 0.0_rkind
 
-  ! ============================================================
-  !2. Reset inflow and outflow
-  ! ============================================================
-  elements%hydrobal(:)%inflow  = 0.0_rkind
-  elements%hydrobal(:)%outflow = 0.0_rkind
+    do el = 1, elements%kolik
+      old_storage = storage(el)
 
-  do el = 1_ikind, elements%kolik
+      water_available = Pm(el,tstep) + old_storage
 
-     old_storage = storage(el)
+      losses = elements%hydrobal(el)%ET + elements%hydrobal(el)%q1
+      losses = min(losses, water_available)
 
-     ! ============================================================
-  ! 3. Local water balance
-  ! ============================================================
-     water_available = precip(el,tstep) + old_storage
+      storage_capacity = capacity(el) / &
+           (1.0_rkind + storage_slope_coeff * max(elements%slope(el), 0.0_rkind))
 
-     losses = elements%hydrobal(el)%ET + &
-              elements%hydrobal(el)%qsurf + &
-              elements%hydrobal(el)%q2 + &
-              elements%hydrobal(el)%q3 + &
-               elements%hydrobal(el)%bf + &
-               elements%hydrobal(el)%pc
+      storage_capacity = max(storage_capacity, 0.0_rkind)
 
-     losses = min(losses, water_available)
+      available_after_losses = water_available - losses
 
-     ! ============================================================
-  ! 4. Storage capacity calculation
-  ! ============================================================
-     storage_capacity = capacity(el) / &
-          (1.0_rkind + storage_slope_coeff * max(elements%slope(el), 0.0_rkind))
+      new_storage(el) = min(available_after_losses, storage_capacity)
+      runoff(el)      = max(available_after_losses - new_storage(el), 0.0_rkind)
 
-     storage_capacity = max(storage_capacity, 0.0_rkind)
+      local_residual(el) = water_available - losses - new_storage(el) - runoff(el)
+    end do
 
-     ! ============================================================
-  ! 5. New storage and runoff
-  ! ============================================================
-     available_after_losses = water_available - losses
+    outlet_Q(tstep) = 0.0_rkind
 
-     new_storage(el) = min(available_after_losses, storage_capacity)
+    do i = 1, elements%kolik
+      el = flow_order(i)
 
-     runoff(el) = max(available_after_losses - new_storage(el), 0.0_rkind)
+      routed_water = elements%hydrobal(el)%inflow + runoff(el)
+      elements%hydrobal(el)%outflow = routed_water
 
-
- ! ============================================================
-  !6. Local residual check
-  ! ============================================================
-     local_residual(el) = water_available - losses - new_storage(el) - runoff(el)
-
-  end do
-
-
-! ============================================================
-  !7. Start routing
-  ! ============================================================
-  outlet_Q(tstep) = 0.0_rkind
-
-  do i = 1_ikind, elements%kolik
-
-     el = flow_order(i)
-
-
-! ============================================================
-  !8. Routed water calculation
-  ! ============================================================
-     routed_water = elements%hydrobal(el)%inflow + runoff(el)
-
-     elements%hydrobal(el)%outflow = routed_water
-
-     if (routed_water > 0.0_rkind) then
-
+      if (routed_water > 0.0_rkind) then
         weight_sum = 0.0_rkind
 
-        do side = 1_ikind, 3_ikind
+        do side = 1, 3
+          dwn = elements%downstream(el)%els(side)
 
+          if (dwn > 0_ikind) then
+            edge_weight = max(elements%downstream(el)%slopes(side), 0.0_rkind) * &
+                          max(elements%downstream(el)%widths(side), min_edge_width)
 
-! ============================================================
-  !9. Downstream weight calculation
-  ! ============================================================
-           dwn = elements%downstream(el)%els(side)
-
-           if (dwn > 0_ikind) then
-
-              edge_weight = max(elements%downstream(el)%slopes(side), 0.0_rkind) * &
-                            max(elements%downstream(el)%widths(side), min_edge_width)
-
-              weight_sum = weight_sum + edge_weight
-
-           end if
-
+            weight_sum = weight_sum + edge_weight
+          end if
         end do
 
         if (weight_sum > 0.0_rkind) then
+          do side = 1, 3
+            dwn = elements%downstream(el)%els(side)
 
-           do side = 1_ikind, 3_ikind
+            if (dwn > 0_ikind) then
+              edge_weight = max(elements%downstream(el)%slopes(side), 0.0_rkind) * &
+                            max(elements%downstream(el)%widths(side), min_edge_width)
 
-              dwn = elements%downstream(el)%els(side)
+              routed_fraction = edge_weight / weight_sum
 
-              if (dwn > 0_ikind) then
-
-                 edge_weight = max(elements%downstream(el)%slopes(side), 0.0_rkind) * &
-                               max(elements%downstream(el)%widths(side), min_edge_width)
-
-! ============================================================
-  !10. Flow distribution
-  ! ============================================================
-                 routed_fraction = edge_weight / weight_sum
-
-                 elements%hydrobal(dwn)%inflow = elements%hydrobal(dwn)%inflow + &
-                      routed_water * routed_fraction
-
-              end if
-
-           end do
-
+              elements%hydrobal(dwn)%inflow = elements%hydrobal(dwn)%inflow + &
+                                               routed_water * routed_fraction
+            end if
+          end do
         else
-
-  ! ============================================================
-  !11. Outlet flow
-  ! ============================================================
-
-           outlet_Q(tstep) = outlet_Q(tstep) + routed_water
-
+          outlet_Q(tstep) = outlet_Q(tstep) + routed_water
         end if
+      end if
+    end do
 
-     end if
+    do el = 1, elements%kolik
+      storage(el) = new_storage(el)
 
-  end do
+      elements%overflow(el) = runoff(el)
 
-  do el = 1_ikind, elements%kolik
+      routing_residual(el) = elements%hydrobal(el)%inflow + runoff(el) - &
+                             elements%hydrobal(el)%outflow
 
-  ! ============================================================
-  !12. Save results
-  ! ============================================================
+      elements%hydrobal(el)%deltas = local_residual(el) + routing_residual(el)
 
-     storage(el) = new_storage(el)
+      deltas(el,tstep)          = elements%hydrobal(el)%deltas
+      Qin_result(el,tstep)      = elements%hydrobal(el)%inflow
+      Qout_result(el,tstep)     = elements%hydrobal(el)%outflow
+      Overflow_result(el,tstep) = elements%overflow(el)
+      Storage_result(el,tstep)  = storage(el)
+    end do
 
-     elements%overflow(el) = runoff(el)
+    catchment_area = sum(elements%area)
+    outlet_volume  = outlet_Q(tstep) / 1000.0_rkind * catchment_area
 
-     routing_residual(el) = elements%hydrobal(el)%inflow + runoff(el) - &
-                            elements%hydrobal(el)%outflow
+    if (dt_days > 0.0_rkind) then
+      outlet_Q_m3s(tstep) = outlet_volume / (dt_days * 86400.0_rkind)
+    else
+      outlet_Q_m3s(tstep) = 0.0_rkind
+    end if
 
-     elements%hydrobal(el)%deltas = local_residual(el) + routing_residual(el)
+    deallocate(runoff)
+    deallocate(new_storage)
+    deallocate(local_residual)
+    deallocate(routing_residual)
 
-     deltas(el,tstep)          = elements%hydrobal(el)%deltas
-     Qin_result(el,tstep)      = elements%hydrobal(el)%inflow
-     Qout_result(el,tstep)     = elements%hydrobal(el)%outflow
-     Overflow_result(el,tstep) = elements%overflow(el)
-     Storage_result(el,tstep)  = storage(el)
-
-  end do
-
-  ! ============================================================
-  !13. Outlet discharge conversion
-  ! ============================================================
-  catchment_area = sum(elements%area)
-
-  outlet_volume = outlet_Q(tstep) / 1000.0_rkind * catchment_area
-
-  if (dt_days > 0.0_rkind) then
-     outlet_Q_m3s(tstep) = outlet_volume / (dt_days * 86400.0_rkind)
-  else
-     outlet_Q_m3s(tstep) = 0.0_rkind
-  end if
-
-  deallocate(runoff)
-  deallocate(new_storage)
-  deallocate(local_residual)
-  deallocate(routing_residual)
-
-end subroutine route_step
+  end subroutine route_step
 
 end module routing

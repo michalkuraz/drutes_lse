@@ -15,51 +15,52 @@ contains
 
     do el = 1, elements%kolik
 
-      ! ----------------------------------------------------
-      ! All fluxes here are mm per timestep
-      ! ----------------------------------------------------
-      Pm(el,tstep)      = precip_m_step(el,tstep)
-      E_m(el,tstep)     = evap_m_step(el,tstep)
-      If_m(el,tstep)    = infil_m_step(el,tstep)
-      Qsurf_m(el,tstep) = qsurf_m_step(el,tstep)
-      q2(el,tstep)      = q2_m_step(el,tstep)
-      q3(el,tstep)      = q3_m_step(el,tstep)
-      pc(el,tstep)      = pc_m_step(el,tstep)
-      bf(el,tstep)      = bf_m_step(el,tstep)
+      ! ==========================================================
+      ! Fluxes from the LaTeX ODE system [mm/timestep]
+      ! ==========================================================
+      Pm(el,tstep) = precip_m_step(el,tstep)
+      E_m(el,tstep) = evap_m_step(el,tstep)
+      If_m(el,tstep) = infil_m_step(el,tstep)
 
-      ! Optional aliases used by older output/routing code
-      inf(el,tstep)     = If_m(el,tstep)
-      Qsub_m(el,tstep)  = q2(el,tstep) + q3(el,tstep)
-      Qgw_m(el,tstep)   = bf(el,tstep)
+      q1(el,tstep) = q1_m_step(el,tstep)
+      q2(el,tstep) = q2_m_step(el,tstep)
+      q3(el,tstep) = q3_m_step(el,tstep)
+      pc(el,tstep) = pc_m_step(el,tstep)
+      bf(el,tstep) = bf_m_step(el,tstep)
 
-      ! ----------------------------------------------------
-      ! Storage increments as equivalent depth [mm/timestep]
-      ! ----------------------------------------------------
-      dVsurf(el,tstep) = Pm(el,tstep) - If_m(el,tstep) - &
-                         E_m(el,tstep) - Qsurf_m(el,tstep)
+      ! ==========================================================
+      ! Direct ODE water balance in depth units [mm]
+      !
+      ! dSsurf = P - E - q1
+      ! dSsub  = If - q2 - q3 - pc
+      ! dSgw   = pc - bf
+      ! ==========================================================
 
-      dVsub(el,tstep)  = If_m(el,tstep) - q2(el,tstep) - &
-                         q3(el,tstep) - pc(el,tstep)
+      dSsurf(el,tstep) = Pm(el,tstep) - E_m(el,tstep) - q1(el,tstep)
 
-      dVgw(el,tstep)   = pc(el,tstep) - bf(el,tstep)
+      dSsub(el,tstep) = If_m(el,tstep) - q2(el,tstep) - &
+                        q3(el,tstep) - pc(el,tstep)
 
-      dv_total = dVsurf(el,tstep) + dVsub(el,tstep) + dVgw(el,tstep)
+      dSgw(el,tstep) = pc(el,tstep) - bf(el,tstep)
+      total_deltaS(el,tstep) = dSsurf(el,tstep) + dSsub(el,tstep) + dSgw(el,tstep)
 
-      ! ----------------------------------------------------
-      ! Routing variables: mm per timestep
-      ! ----------------------------------------------------
-      ET_flux(el,tstep)      = E_m(el,tstep)
-      Inf_result(el,tstep)   = If_m(el,tstep)
-      Qsurf_result(el,tstep) = Qsurf_m(el,tstep)
-      Qgw_result(el,tstep)   = Qgw_m(el,tstep)
+      Ssurf(el) = max(0.0_rkind, Ssurf(el) + dSsurf(el,tstep))
+      Ssub(el)  = max(0.0_rkind, Ssub(el)  + dSsub(el,tstep))
+      Sgw(el)   = max(0.0_rkind, Sgw(el)   + dSgw(el,tstep))
 
-      elements%hydrobal(el)%ET    = ET_flux(el,tstep)
-      elements%hydrobal(el)%Qsurf = Qsurf_result(el,tstep)
-      elements%hydrobal(el)%Qgw   = Qgw_result(el,tstep)
-      elements%hydrobal(el)%q2    = q2(el,tstep)
-      elements%hydrobal(el)%q3    = q3(el,tstep)
-      elements%hydrobal(el)%pc    = pc(el,tstep)
-      elements%hydrobal(el)%bf    = bf(el,tstep)
+      Ssurf_hist(el,tstep) = Ssurf(el)
+      Ssub_hist(el,tstep)  = Ssub(el)
+      Sgw_hist(el,tstep)   = Sgw(el)
+      
+
+      ! Values needed by routing
+      elements%hydrobal(el)%ET      = E_m(el,tstep)
+      elements%hydrobal(el)%q1      = q1(el,tstep)
+      elements%hydrobal(el)%q2      = q2(el,tstep)
+      elements%hydrobal(el)%q3      = q3(el,tstep)
+      elements%hydrobal(el)%pc      = pc(el,tstep)
+      elements%hydrobal(el)%bf      = bf(el,tstep)
+      elements%hydrobal(el)%storage = Ssurf(el)
 
       elements%hydrobal(el)%inflow  = 0.0_rkind
       elements%hydrobal(el)%outflow = 0.0_rkind
@@ -72,15 +73,21 @@ contains
   subroutine compute_all()
     integer(kind=ikind) :: t
 
+    time      = 0.0_rkind
+    time_step = dt_seconds
+    end_time  = ntot_days * 86400.0_rkind
+
+    call timestamps%clear(.true.)
+
     do t = 1, n_steps
+      time = time + time_step
+      call timestamps%fill(time)
+
       call update_storage_odes(t)
       call route_step(t)
-    end do
 
-    print *, "DEBUG after compute:"
-    print *, "Pm(1,49)  = ", Pm(1,49)
-    print *, "Pm(1,72)  = ", Pm(1,72)
-    print *, "Pm(1,240) = ", Pm(1,240)
+      if (time >= end_time) exit
+    end do
 
   end subroutine compute_all
 

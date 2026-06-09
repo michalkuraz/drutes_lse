@@ -11,141 +11,90 @@ contains
   ! READ MESH
   !==============================================================
   subroutine read_mesh(filename)
+    character(len=*), intent(in) :: filename
 
-  character(len=*), intent(in) :: filename
+    integer :: fileid, ios
+    integer(kind=ikind) :: i
+    real(kind=rkind) :: node_id, element_id
 
-  integer :: fileid
-  integer :: ios
-  integer(kind=ikind) :: i
-  real(kind=rkind)    :: node_id
-  real(kind=rkind)    :: element_id
+    open(newunit=fileid, file=filename, status='old', action='read', iostat=ios)
+    if (ios /= 0) error stop 'Error: could not open mesh file.'
 
-  open(newunit=fileid, file=filename, status='old', action='read', iostat=ios)
+    call comment(fileid)
+    read(fileid, *, iostat=ios) nodes%kolik
+    if (ios /= 0) error stop 'Error: failed to read number of nodes.'
 
-  if (ios /= 0_ikind) then
-     error stop 'Error: could not open mesh file.'
-  end if
+    allocate(nodes%data(nodes%kolik, 2))
+    allocate(nodes%altitude(nodes%kolik))
 
-  call comment(fileid)
-  read(fileid, *, iostat=ios) nodes%kolik
-  if (ios /= 0_ikind) error stop 'Error: failed to read number of nodes.'
+    do i = 1, nodes%kolik
+      call comment(fileid)
+      read(fileid, *, iostat=ios) node_id, nodes%data(i,1), nodes%data(i,2), nodes%altitude(i)
+      if (ios /= 0) error stop 'Error: failed to read node data.'
+    end do
 
-  allocate(nodes%data(nodes%kolik, 2))
-  allocate(nodes%altitude(nodes%kolik))
+    call comment(fileid)
+    read(fileid, *, iostat=ios) elements%kolik
+    if (ios /= 0) error stop 'Error: failed to read number of elements.'
 
-  do i = 1_ikind, nodes%kolik
+    call mesh_allocater()
 
-     call comment(fileid)
+    do i = 1, elements%kolik
+      call comment(fileid)
+      read(fileid, *, iostat=ios) element_id, elements%data(i,1), elements%data(i,2), elements%data(i,3)
+      if (ios /= 0) error stop 'Error: failed to read element data.'
+    end do
 
-     read(fileid, *, iostat=ios) node_id, nodes%data(i,1), &
-                                 nodes%data(i,2), nodes%altitude(i)
-
-     if (ios /= 0_ikind) then
-        error stop 'Error: failed to read node data.'
-     end if
-
-  end do
-
-  call comment(fileid)
-  read(fileid, *, iostat=ios) elements%kolik
-  if (ios /= 0_ikind) error stop 'Error: failed to read number of elements.'
-
-  call mesh_allocater()
-
-  do i = 1_ikind, elements%kolik
-
-     call comment(fileid)
-
-     read(fileid, *, iostat=ios) element_id, elements%data(i,1), &
-                                    elements%data(i,2), &
-                                    elements%data(i,3)
-
-     if (ios /= 0_ikind) then
-        error stop 'Error: failed to read element data.'
-     end if
-
-  end do
-
-  close(fileid)
-
-end subroutine read_mesh
+    close(fileid)
+  end subroutine read_mesh
 
 
   !==============================================================
   ! ALLOCATE MESH ARRAYS
   !==============================================================
   subroutine mesh_allocater()
+    integer(kind=ikind) :: el
 
-  integer(kind=ikind) :: el
+    if (.not. allocated(elements%data))       allocate(elements%data(elements%kolik, 3))
+    if (.not. allocated(elements%area))       allocate(elements%area(elements%kolik))
+    if (.not. allocated(elements%material))   allocate(elements%material(elements%kolik))
+    if (.not. allocated(elements%avgalt))     allocate(elements%avgalt(elements%kolik))
+    if (.not. allocated(elements%slope))      allocate(elements%slope(elements%kolik))
+    if (.not. allocated(elements%overflow))   allocate(elements%overflow(elements%kolik))
+    if (.not. allocated(elements%neighbours)) allocate(elements%neighbours(elements%kolik, 3))
+    if (.not. allocated(elements%upstream))   allocate(elements%upstream(elements%kolik))
+    if (.not. allocated(elements%downstream)) allocate(elements%downstream(elements%kolik))
+    if (.not. allocated(elements%hydrobal))   allocate(elements%hydrobal(elements%kolik))
 
-  if (.not. allocated(elements%data)) then
-     allocate(elements%data(elements%kolik, 3))
-  end if
+    elements%data       = 0_ikind
+    elements%area       = 0.0_rkind
+    elements%material   = 0_ikind
+    elements%avgalt     = 0.0_rkind
+    elements%slope      = 0.0_rkind
+    elements%overflow   = 0.0_rkind
+    elements%neighbours = 0_ikind
 
-  if (.not. allocated(elements%area)) then
-     allocate(elements%area(elements%kolik))
-  end if
+    do el = 1, elements%kolik
+      elements%upstream(el)%els    = 0_ikind
+      elements%upstream(el)%slopes = 0.0_rkind
+      elements%upstream(el)%widths = 0.0_rkind
 
-  if (.not. allocated(elements%material)) then
-     allocate(elements%material(elements%kolik))
-  end if
+      elements%downstream(el)%els    = 0_ikind
+      elements%downstream(el)%slopes = 0.0_rkind
+      elements%downstream(el)%widths = 0.0_rkind
 
-  if (.not. allocated(elements%avgalt)) then
-     allocate(elements%avgalt(elements%kolik))
-  end if
-
-  if (.not. allocated(elements%slope)) then
-     allocate(elements%slope(elements%kolik))
-  end if
-
-  if (.not. allocated(elements%overflow)) then
-     allocate(elements%overflow(elements%kolik))
-  end if
-
-  if (.not. allocated(elements%neighbours)) then
-     allocate(elements%neighbours(elements%kolik, 3))
-  end if
-
-  if (.not. allocated(elements%upstream)) then
-     allocate(elements%upstream(elements%kolik))
-  end if
-
-  if (.not. allocated(elements%downstream)) then
-     allocate(elements%downstream(elements%kolik))
-  end if
-
-  if (.not. allocated(elements%hydrobal)) then
-     allocate(elements%hydrobal(elements%kolik))
-  end if
-
-  elements%data       = 0_ikind
-  elements%area       = 0.0_rkind
-  elements%material   = 0_ikind
-  elements%avgalt     = 0.0_rkind
-  elements%slope      = 0.0_rkind
-  elements%overflow   = 0.0_rkind
-  elements%neighbours = 0_ikind
-
-    do el = 1_ikind, elements%kolik
-
-     elements%upstream(el)%els    = 0_ikind
-     elements%upstream(el)%slopes = 0.0_rkind
-     elements%upstream(el)%widths = 0.0_rkind
-
-     elements%downstream(el)%els    = 0_ikind
-     elements%downstream(el)%slopes = 0.0_rkind
-     elements%downstream(el)%widths = 0.0_rkind
-
-     elements%hydrobal(el)%inflow  = 0.0_rkind
-     elements%hydrobal(el)%outflow = 0.0_rkind
-     elements%hydrobal(el)%ET      = 0.0_rkind
-     !elements%hydrobal(el)%Li      = 0.0_rkind
-     elements%hydrobal(el)%Qgw     = 0.0_rkind
-     elements%hydrobal(el)%deltas  = 0.0_rkind
-
-  end do
-
-end subroutine mesh_allocater
+      elements%hydrobal(el)%inflow  = 0.0_rkind
+      elements%hydrobal(el)%outflow = 0.0_rkind
+      elements%hydrobal(el)%ET      = 0.0_rkind
+      elements%hydrobal(el)%q1      = 0.0_rkind
+      elements%hydrobal(el)%q2      = 0.0_rkind
+      elements%hydrobal(el)%q3      = 0.0_rkind
+      elements%hydrobal(el)%pc      = 0.0_rkind
+      elements%hydrobal(el)%bf      = 0.0_rkind
+      elements%hydrobal(el)%deltas  = 0.0_rkind
+      elements%hydrobal(el)%storage = 0.0_rkind
+    end do
+  end subroutine mesh_allocater
 
 
   !==============================================================
@@ -163,9 +112,6 @@ end subroutine mesh_allocater
     real(kind=rkind), dimension(10) :: rhminday
     real(kind=rkind), dimension(10) :: soilday
 
-    !------------------------------------------------------------
-    ! Allocate forcing and result arrays
-    !------------------------------------------------------------
     allocate(precip(elements%kolik, n_steps))
     allocate(qinter(elements%kolik, n_steps))
     allocate(qout(elements%kolik, n_steps))
@@ -184,56 +130,39 @@ end subroutine mesh_allocater
     allocate(uz(elements%kolik, n_steps))
     allocate(soilcontent(elements%kolik, n_steps))
 
-    allocate(Qsurf_result(elements%kolik, n_steps))
-    allocate(ET_flux(elements%kolik, n_steps))
-    !allocate(L_result(elements%kolik, n_steps))
-    allocate(Qgw_result(elements%kolik, n_steps))
-    allocate(Inf_result(elements%kolik, n_steps))
-    allocate(pc(elements%kolik, n_steps))
+    allocate(Pm(elements%kolik, n_steps))
+    allocate(E_m(elements%kolik, n_steps))
+    allocate(If_m(elements%kolik, n_steps))
+    allocate(q1(elements%kolik, n_steps))
     allocate(q2(elements%kolik, n_steps))
     allocate(q3(elements%kolik, n_steps))
+    allocate(pc(elements%kolik, n_steps))
     allocate(bf(elements%kolik, n_steps))
-    allocate(deltas(elements%kolik, n_steps))
+
+    allocate(Ssurf(elements%kolik))
+    allocate(Ssub(elements%kolik))
+    allocate(Sgw(elements%kolik))
+
+    allocate(dSsurf(elements%kolik, n_steps))
+    allocate(dSsub(elements%kolik, n_steps))
+    allocate(dSgw(elements%kolik, n_steps))
+
+    allocate(Ssurf_hist(elements%kolik, n_steps))
+    allocate(Ssub_hist(elements%kolik, n_steps))
+    allocate(Sgw_hist(elements%kolik, n_steps))
 
     allocate(Qin_result(elements%kolik, n_steps))
     allocate(Qout_result(elements%kolik, n_steps))
     allocate(Overflow_result(elements%kolik, n_steps))
     allocate(Storage_result(elements%kolik, n_steps))
+    allocate(deltas(elements%kolik, n_steps))
+    allocate(total_deltaS(elements%kolik, n_steps))
     allocate(outlet_Q_m3s(n_steps))
 
     allocate(storage(elements%kolik))
     allocate(capacity(elements%kolik))
     allocate(outlet_Q(n_steps))
 
-    !------------------------------------------------------------
-    ! Allocate ODE water balance arrays
-    !------------------------------------------------------------
-    allocate(Pm(elements%kolik, n_steps))
-    allocate(E_m(elements%kolik, n_steps))
-    allocate(If_m(elements%kolik, n_steps))
-    allocate(Qsurf_m(elements%kolik, n_steps))
-    !allocate(Tv_m(elements%kolik, n_steps))
-    !allocate(Qsub_m(elements%kolik, n_steps))
-    !allocate(Rv_m(elements%kolik, n_steps))
-    !allocate(Qgw_m(elements%kolik, n_steps))
-
-    allocate(dVsurf(elements%kolik, n_steps))
-    allocate(dVsub(elements%kolik, n_steps))
-    allocate(dVgw(elements%kolik, n_steps))
-
-
-    !allocate(Ssurf(elements%kolik))
-    !allocate(Ssub(elements%kolik))
-    !allocate(Sgw(elements%kolik))
-
-    !allocate(Ssurf_hist(elements%kolik, n_steps))
-    !allocate(Ssub_hist(elements%kolik, n_steps))
-    !allocate(Sgw_hist(elements%kolik, n_steps))
-    allocate(inf(elements%kolik, n_steps))
-
-    !------------------------------------------------------------
-    ! Initialize everything to zero
-    !------------------------------------------------------------
     precip      = 0.0_rkind
     qinter      = 0.0_rkind
     qout        = 0.0_rkind
@@ -248,75 +177,41 @@ end subroutine mesh_allocater
     uz          = 0.0_rkind
     soilcontent = 0.0_rkind
 
-    Qsurf_result = 0.0_rkind
-    ET_flux      = 0.0_rkind
-    !L_result     = 0.0_rkind
-    Qgw_result   = 0.0_rkind
-    Inf_result   = 0.0_rkind
-    pc           = 0.0_rkind
-    q2           = 0.0_rkind
-    q3           = 0.0_rkind
-    bf           = 0.0_rkind
-    storage      = 0.0_rkind
-    deltas       = 0.0_rkind
+    Pm = 0.0_rkind
+    E_m = 0.0_rkind
+    If_m = 0.0_rkind
+    q1 = 0.0_rkind
+    q2 = 0.0_rkind
+    q3 = 0.0_rkind
+    pc = 0.0_rkind
+    bf = 0.0_rkind
+
+    Ssurf = 0.0_rkind
+    Ssub  = 0.0_rkind
+    Sgw   = 0.0_rkind
+
+    dSsurf = 0.0_rkind
+    dSsub  = 0.0_rkind
+    dSgw   = 0.0_rkind
+
+    Ssurf_hist = 0.0_rkind
+    Ssub_hist  = 0.0_rkind
+    Sgw_hist   = 0.0_rkind
 
     Qin_result      = 0.0_rkind
     Qout_result     = 0.0_rkind
     Overflow_result = 0.0_rkind
     Storage_result  = 0.0_rkind
+    deltas       = 0.0_rkind
+    total_deltaS = 0.0_rkind
     outlet_Q_m3s    = 0.0_rkind
 
-    
+    storage  = 0.0_rkind
     capacity = 8.0_rkind
     outlet_Q = 0.0_rkind
 
-    Pm      = 0.0_rkind
-    E_m     = 0.0_rkind
-    If_m    = 0.0_rkind
-    Qsurf_m = 0.0_rkind
-    Tv_m    = 0.0_rkind
-    Qsub_m  = 0.0_rkind
-    Rv_m    = 0.0_rkind
-    Qgw_m   = 0.0_rkind
-
-    dVsurf = 0.0_rkind
-    dVsub  = 0.0_rkind
-    dVgw   = 0.0_rkind
-
-    !Ssurf = 0.0_rkind
-    !Ssub  = 0.0_rkind
-    !Sgw   = 0.0_rkind
-
-    !Ssurf_hist = 0.0_rkind
-    !Ssub_hist  = 0.0_rkind
-    !Sgw_hist   = 0.0_rkind
-    inf = 0.0_rkind
-
-    !------------------------------------------------------------
-    ! Initialize hydrobal structure
-    !------------------------------------------------------------
-    if (allocated(elements%hydrobal)) then
-      do i = 1, elements%kolik
-        elements%hydrobal(i)%inflow  = 0.0_rkind
-        elements%hydrobal(i)%outflow = 0.0_rkind
-        elements%hydrobal(i)%Li      = 0.0_rkind
-        elements%hydrobal(i)%ET      = 0.0_rkind
-        elements%hydrobal(i)%Qgw     = 0.0_rkind
-        elements%hydrobal(i)%Qsurf   = 0.0_rkind
-        elements%hydrobal(i)%q2      = 0.0_rkind
-        elements%hydrobal(i)%q3      = 0.0_rkind
-        elements%hydrobal(i)%pc      = 0.0_rkind
-        elements%hydrobal(i)%bf      = 0.0_rkind
-        elements%hydrobal(i)%deltas  = 0.0_rkind
-        elements%hydrobal(i)%storage = 0.0_rkind
-      end do
-    end if
-
     if (n_steps < 10) stop "Need at least 10 time steps for the hardcoded forcing."
 
-    !------------------------------------------------------------
-    ! Daily forcing values
-    !------------------------------------------------------------
     pday = [0.0_rkind, 0.0_rkind, 17.0_rkind, 12.0_rkind, 9.0_rkind, &
             7.0_rkind, 40.0_rkind, 0.0_rkind, 0.0_rkind, 3.0_rkind]
 
@@ -339,11 +234,8 @@ end subroutine mesh_allocater
                 76.0_rkind, 74.0_rkind, 59.0_rkind, 62.0_rkind, 61.0_rkind]
 
     soilday = [0.32_rkind, 0.34_rkind, 0.33_rkind, 0.30_rkind, 0.27_rkind, &
-           0.24_rkind, 0.22_rkind, 0.23_rkind, 0.26_rkind, 0.29_rkind]
+               0.24_rkind, 0.22_rkind, 0.23_rkind, 0.26_rkind, 0.29_rkind]
 
-    !------------------------------------------------------------
-    ! Fill hourly time series from daily values
-    !------------------------------------------------------------
     do i = 1, elements%kolik
       do t = 1, n_steps
         d = int((t - 1) / 24) + 1
@@ -360,53 +252,43 @@ end subroutine mesh_allocater
       end do
     end do
 
-    !------------------------------------------------------------
-    ! Model parameters
-    !------------------------------------------------------------
-    ! Base saturated conductivity
-      conduct = 0.00002_rkind
+    conduct   = 0.00002_rkind
+    Ksat_surf = 1.0e-6_rkind
+    Ksat_sub  = 5.0e-7_rkind
+    Ksat_gw   = 1.0e-6_rkind
 
-     ! Different conductivities for different layers [m/s]
-     Ksat_surf = 1.0e-6_rkind   ! unsaturated surface, lower effective K
-     Ksat_sub  = 5.0e-7_rkind   ! subsurface
-     Ksat_gw   = 1.0e-6_rkind    ! saturated groundwater
+    ksurf_exp = 3.0_rkind
+    ksub_exp  = 2.0_rkind
 
-      ksurf_exp = 3.0_rkind
-      ksub_exp  = 2.0_rkind
-      G       = 0.0_rkind
+    CN         = 98
+    z          = 235.0_rkind
+    Julian_day = 172
+    phi        = 0.614_rkind
+    as         = 0.25_rkind
+    bs         = 0.5_rkind
+    alpha      = 0.23_rkind
+    sigma      = 4.903e-5_rkind
+    gsc        = 0.0820_rkind
+    ccrop      = 0.95_rkind
 
-      CN         = 98
-      z          = 235.0_rkind
-      Julian_day = 172
-      phi        = 0.614_rkind      ! Latakia/Balloran area ≈ 35.2°N
-      as         = 0.25_rkind
-      bs         = 0.5_rkind
-      alpha      = 0.23_rkind
-      sigma      = 4.903e-5_rkind
-      gsc        = 0.0820_rkind
-      ccrop      = 0.95_rkind
+    cn_slope_coeff      = 0.15_rkind
+    storage_slope_coeff = 4.0_rkind
+    qgw_slope_coeff     = 0.5_rkind
+    min_edge_width      = 1.0e-6_rkind
 
-    !------------------------------------------------------------
-    ! Optional slope / infiltration parameters
-    ! Only keep these if declared in globals.f90
-    !------------------------------------------------------------
-     cn_slope_coeff      = 0.15_rkind
-     storage_slope_coeff = 4.0_rkind
-     qgw_slope_coeff     = 0.5_rkind
-     min_edge_width      = 1.0e-6_rkind
-     theta_r = 0.08_rkind
-     theta_s = 0.42_rkind
-     Beta1 = 0.0_rkind
-     Beta2 = 0.05_rkind
-     Beta3 = 1.0_rkind
-     Beta4 = 0.03_rkind
-     Beta5 = 0.02_rkind
-     z1 = 0.0_rkind
-     z2 = 1.0_rkind
-     infil_slope_coeff   = 8.0_rkind
+    theta_r = 0.08_rkind
+    theta_s = 0.42_rkind
 
-    print *, "DEBUG precip(1,49) = ", precip(1,49)
-    print *, "DEBUG precip(1,72) = ", precip(1,72)
+    Beta1 = 0.0_rkind
+    Beta2 = 0.05_rkind
+    Beta3 = 1.0_rkind
+    Beta4 = 0.03_rkind
+    Beta5 = 0.02_rkind
+
+    z1 = 0.0_rkind
+    z2 = 1.0_rkind
+
+    infil_slope_coeff = 8.0_rkind
 
   end subroutine init_hydro
 

@@ -135,4 +135,17 @@ module globals
   ! Storage histories [mm]
   real(kind=rkind), allocatable :: Ssurf_hist(:,:), Ssub_hist(:,:), Sgw_hist(:,:)
 
+  type :: meteodata_str
+  type(smartarray_real) :: time
+  type(smartarray_real) :: rainfall
+  type(smartarray_real) :: Tmax
+  type(smartarray_real) :: Tmin
+  type(smartarray_real) :: wind
+  type(smartarray_real) :: RHmax
+  type(smartarray_real) :: RHmin
+  type(smartarray_real) :: soilcontent
+end type meteodata_str
+
+type(meteodata_str), dimension(:), allocatable :: meteodata
+
 end module globals

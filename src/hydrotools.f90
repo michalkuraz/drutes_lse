@@ -96,6 +96,52 @@ contains
     end do
   end subroutine mesh_allocater
 
+  !==============================================================
+  ! read_meteodata
+  !==============================================================
+  subroutine read_meteodata_csv(filename)
+  character(len=*), intent(in) :: filename
+
+  integer :: unit, ios
+  character(len=1024) :: header
+  real(kind=rkind) :: rowdata(8)
+
+  if (.not. allocated(meteodata)) allocate(meteodata(1))
+
+  open(newunit=unit, file=filename, status="old", action="read", iostat=ios)
+
+  if (ios /= 0) then
+    print *, "ERROR: cannot open meteorological CSV file: ", trim(filename)
+    error stop
+  end if
+
+  ! Skip header line
+  read(unit, '(A)', iostat=ios) header
+
+  do
+    read(unit, *, iostat=ios) rowdata
+    if (ios /= 0) exit
+
+    call meteodata(1)%time%fill(rowdata(1))
+    call meteodata(1)%rainfall%fill(rowdata(2))
+    call meteodata(1)%Tmax%fill(rowdata(3))
+    call meteodata(1)%Tmin%fill(rowdata(4))
+    call meteodata(1)%wind%fill(rowdata(5))
+    call meteodata(1)%RHmax%fill(rowdata(6))
+    call meteodata(1)%RHmin%fill(rowdata(7))
+    call meteodata(1)%soilcontent%fill(rowdata(8))
+  end do
+
+  close(unit)
+
+  if (meteodata(1)%time%pos < 1) then
+    print *, "ERROR: meteorological file is empty."
+    error stop
+  end if
+
+  print *, "Meteo records read = ", meteodata(1)%time%pos
+
+end subroutine read_meteodata_csv
 
   !==============================================================
   ! INITIALIZE HYDROLOGY
@@ -103,14 +149,14 @@ contains
   subroutine init_hydro()
     integer(kind=ikind) :: i, t, d
 
-    real(kind=rkind), dimension(10) :: pday
-    real(kind=rkind), dimension(10) :: uzday
-    real(kind=rkind), dimension(10) :: tmaxday
-    real(kind=rkind), dimension(10) :: tminday
-    real(kind=rkind), dimension(10) :: tmeanday
-    real(kind=rkind), dimension(10) :: rhmaxday
-    real(kind=rkind), dimension(10) :: rhminday
-    real(kind=rkind), dimension(10) :: soilday
+    !real(kind=rkind), dimension(10) :: pday
+    !real(kind=rkind), dimension(10) :: uzday
+    !real(kind=rkind), dimension(10) :: tmaxday
+    !real(kind=rkind), dimension(10) :: tminday
+    !real(kind=rkind), dimension(10) :: tmeanday
+    !real(kind=rkind), dimension(10) :: rhmaxday
+    !real(kind=rkind), dimension(10) :: rhminday
+    !real(kind=rkind), dimension(10) :: soilday
 
     allocate(precip(elements%kolik, n_steps))
     allocate(qinter(elements%kolik, n_steps))
@@ -122,13 +168,13 @@ contains
     allocate(Ksat_gw(elements%kolik))
     allocate(G(elements%kolik))
 
-    allocate(Tmax(elements%kolik, n_steps))
-    allocate(Tmin(elements%kolik, n_steps))
-    allocate(Tmean(elements%kolik, n_steps))
-    allocate(RHmax(elements%kolik, n_steps))
-    allocate(RHmin(elements%kolik, n_steps))
-    allocate(uz(elements%kolik, n_steps))
-    allocate(soilcontent(elements%kolik, n_steps))
+    !allocate(Tmax(elements%kolik, n_steps))
+    !allocate(Tmin(elements%kolik, n_steps))
+    !allocate(Tmean(elements%kolik, n_steps))
+    !allocate(RHmax(elements%kolik, n_steps))
+    !allocate(RHmin(elements%kolik, n_steps))
+    !allocate(uz(elements%kolik, n_steps))
+    !allocate(soilcontent(elements%kolik, n_steps))
 
     allocate(Pm(elements%kolik, n_steps))
     allocate(E_m(elements%kolik, n_steps))
@@ -169,13 +215,13 @@ contains
     conduct     = 0.0_rkind
     G           = 0.0_rkind
 
-    Tmax        = 0.0_rkind
-    Tmin        = 0.0_rkind
-    Tmean       = 0.0_rkind
-    RHmax       = 0.0_rkind
-    RHmin       = 0.0_rkind
-    uz          = 0.0_rkind
-    soilcontent = 0.0_rkind
+    !Tmax        = 0.0_rkind
+    !Tmin        = 0.0_rkind
+    !Tmean       = 0.0_rkind
+    !RHmax       = 0.0_rkind
+    !RHmin       = 0.0_rkind
+    !uz          = 0.0_rkind
+    !soilcontent = 0.0_rkind
 
     Pm = 0.0_rkind
     E_m = 0.0_rkind
@@ -210,47 +256,68 @@ contains
     capacity = 8.0_rkind
     outlet_Q = 0.0_rkind
 
-    if (n_steps < 10) stop "Need at least 10 time steps for the hardcoded forcing."
+    !if (n_steps < 10) stop "Need at least 10 time steps for the hardcoded forcing."
 
-    pday = [0.0_rkind, 0.0_rkind, 17.0_rkind, 12.0_rkind, 9.0_rkind, &
-            7.0_rkind, 40.0_rkind, 0.0_rkind, 0.0_rkind, 3.0_rkind]
+    !pday = [0.0_rkind, 0.0_rkind, 17.0_rkind, 12.0_rkind, 9.0_rkind, &
+    !        7.0_rkind, 40.0_rkind, 0.0_rkind, 0.0_rkind, 3.0_rkind]
 
-    uzday = [4.38_rkind, 3.57_rkind, 4.026_rkind, 3.097_rkind, 4.14_rkind, &
-             3.13_rkind, 3.92_rkind, 3.19_rkind, 3.98_rkind, 3.34_rkind]
+    !uzday = [4.38_rkind, 3.57_rkind, 4.026_rkind, 3.097_rkind, 4.14_rkind, &
+    !         3.13_rkind, 3.92_rkind, 3.19_rkind, 3.98_rkind, 3.34_rkind]
 
-    tmaxday = [19.1_rkind, 15.3_rkind, 12.8_rkind, 11.8_rkind, 10.5_rkind, &
-               15.2_rkind, 11.6_rkind, 14.6_rkind, 17.2_rkind, 16.4_rkind]
+    !tmaxday = [19.1_rkind, 15.3_rkind, 12.8_rkind, 11.8_rkind, 10.5_rkind, &
+    !           15.2_rkind, 11.6_rkind, 14.6_rkind, 17.2_rkind, 16.4_rkind]
 
-    tminday = [5.4_rkind, 6.8_rkind, 8.8_rkind, 7.6_rkind, 8.4_rkind, &
-               8.3_rkind, 8.8_rkind, 6.2_rkind, 4.8_rkind, 6.2_rkind]
+    !tminday = [5.4_rkind, 6.8_rkind, 8.8_rkind, 7.6_rkind, 8.4_rkind, &
+    !           8.3_rkind, 8.8_rkind, 6.2_rkind, 4.8_rkind, 6.2_rkind]
 
-    tmeanday = [12.25_rkind, 11.05_rkind, 10.8_rkind, 9.7_rkind, 9.45_rkind, &
-                11.75_rkind, 10.2_rkind, 10.4_rkind, 11.0_rkind, 9.7_rkind]
+    !tmeanday = [12.25_rkind, 11.05_rkind, 10.8_rkind, 9.7_rkind, 9.45_rkind, &
+    !            11.75_rkind, 10.2_rkind, 10.4_rkind, 11.0_rkind, 9.7_rkind]
 
-    rhmaxday = [84.0_rkind, 85.0_rkind, 76.0_rkind, 87.0_rkind, 92.0_rkind, &
-                94.0_rkind, 97.0_rkind, 92.0_rkind, 93.0_rkind, 97.0_rkind]
+    !rhmaxday = [84.0_rkind, 85.0_rkind, 76.0_rkind, 87.0_rkind, 92.0_rkind, &
+               !94.0_rkind, 97.0_rkind, 92.0_rkind, 93.0_rkind, 97.0_rkind]
 
-    rhminday = [56.0_rkind, 64.0_rkind, 64.0_rkind, 77.0_rkind, 77.0_rkind, &
-                76.0_rkind, 74.0_rkind, 59.0_rkind, 62.0_rkind, 61.0_rkind]
+    !rhminday = [56.0_rkind, 64.0_rkind, 64.0_rkind, 77.0_rkind, 77.0_rkind, &
+    !            76.0_rkind, 74.0_rkind, 59.0_rkind, 62.0_rkind, 61.0_rkind]
 
-    soilday = [0.32_rkind, 0.34_rkind, 0.33_rkind, 0.30_rkind, 0.27_rkind, &
-               0.24_rkind, 0.22_rkind, 0.23_rkind, 0.26_rkind, 0.29_rkind]
+    !soilday = [0.32_rkind, 0.34_rkind, 0.33_rkind, 0.30_rkind, 0.27_rkind, &
+               !0.24_rkind, 0.22_rkind, 0.23_rkind, 0.26_rkind, 0.29_rkind]
 
-    do i = 1, elements%kolik
-      do t = 1, n_steps
-        d = int((t - 1) / 24) + 1
-        if (d > 10) d = 10
+    !do i = 1, elements%kolik
+     ! do t = 1, n_steps
+        !d = int((t - 1) / 24) + 1
+       ! if (d > 10) d = 10
 
-        precip(i,t)      = pday(d) / 24.0_rkind
-        uz(i,t)          = uzday(d)
-        Tmax(i,t)        = tmaxday(d)
-        Tmin(i,t)        = tminday(d)
-        Tmean(i,t)       = tmeanday(d)
-        RHmax(i,t)       = rhmaxday(d)
-        RHmin(i,t)       = rhminday(d)
-        soilcontent(i,t) = soilday(d)
-      end do
+        !precip(i,t)      = pday(d) / 24.0_rkind
+       ! uz(i,t)          = uzday(d)
+       ! Tmax(i,t)        = tmaxday(d)
+        !Tmin(i,t)        = tminday(d)
+        !Tmean(i,t)       = tmeanday(d)
+       ! RHmax(i,t)       = rhmaxday(d)
+        !RHmin(i,t)       = rhminday(d)
+        !soilcontent(i,t) = soilday(d)
+      !end do
+    !end do
+
+  call read_meteodata_csv("meteo.csv")
+
+     do i = 1, elements%kolik
+       do t = 1, n_steps
+          d = int((t - 1) / 24) + 1
+
+         if (d > meteodata(1)%time%pos) then
+          d = meteodata(1)%time%pos
+          end if
+
+    precip(i,t)      = meteodata(1)%rainfall%data(d) / 24.0_rkind
+    uz(i,t)          = meteodata(1)%wind%data(d)
+    Tmax(i,t)        = meteodata(1)%Tmax%data(d)
+    Tmin(i,t)        = meteodata(1)%Tmin%data(d)
+    Tmean(i,t)       = 0.5_rkind * (Tmax(i,t) + Tmin(i,t))
+    RHmax(i,t)       = meteodata(1)%RHmax%data(d)
+    RHmin(i,t)       = meteodata(1)%RHmin%data(d)
+    soilcontent(i,t) = meteodata(1)%soilcontent%data(d)
     end do
+      end do
 
     conduct   = 0.00002_rkind
     Ksat_surf = 1.0e-6_rkind

@@ -5,8 +5,8 @@ FC     = gfortran
 FFLAGS = -fimplicit-none  -fcoarray=single -fbounds-check -fbacktrace -g -g3 -fdefault-real-8 -O0 -finit-real=nan -Wsurprising
 FFLAGS += -Werror=line-truncation
 
-OBJS = typy.o globals.o core_tools.o debug_tools.o readtools.o printtools.o tools.o \
-     hydrofnc.o hydrotools.o routing.o solver.o hydroprint.o smartarray.o main.o
+OBJS = typy.o smartarray.o globals.o core_tools.o debug_tools.o readtools.o printtools.o tools.o \
+     hydrofnc.o hydrotools.o routing.o solver.o hydroprint.o main.o
 
 TARGET = nour_model
 

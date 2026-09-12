@@ -4,6 +4,16 @@ module globals
   use smartarray
   implicit none
 
+ ! ============================================================
+     ! hydrobal_str
+     !elements_str
+     ! SIMULATION TIME CONTROL
+     !ODE water balance variables, all in depth units [mm]
+  
+! ============================================================
+
+
+
   real(kind=rkind) :: tmp, tmp1, sim_time, start_time, end_time, time, time_step
   logical          :: www
 

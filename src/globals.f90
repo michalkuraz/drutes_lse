@@ -52,13 +52,28 @@ module globals
   type(nodes_str)    :: nodes
   type(elements_str) :: elements
 
-  real(kind=rkind), dimension(:), allocatable :: meteotime
+   ! ============================================================
+! SIMULATION TIME CONTROL
+! ============================================================
 
-  real(kind=rkind), parameter    :: ntot_days  = 10.0_rkind
-  real(kind=rkind), parameter    :: dt_hours   = 1.0_rkind
-  real(kind=rkind), parameter    :: dt_days    = dt_hours / 24.0_rkind
-  real(kind=rkind), parameter    :: dt_seconds = dt_hours * 3600.0_rkind
-  integer(kind=ikind), parameter :: n_steps    = int(ntot_days / dt_days)
+    integer(kind=ikind), parameter :: n_meteo_days = 355_ikind
+
+    real(kind=rkind), parameter :: ntot_days  = &
+     real(n_meteo_days, rkind)
+
+    real(kind=rkind), parameter :: dt_hours   = 1.0_rkind
+
+    real(kind=rkind), parameter :: dt_days    = &
+     dt_hours / 24.0_rkind
+
+    real(kind=rkind), parameter :: dt_seconds = &
+     dt_hours * 3600.0_rkind
+
+    integer(kind=ikind), parameter :: n_steps = &
+     n_meteo_days * 24_ikind
+
+
+     
 
   integer(kind=ikind) :: CN, Julian_day
   real(kind=rkind)    :: phi, as, bs, z, alpha, sigma, gsc, ccrop

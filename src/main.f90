@@ -11,6 +11,24 @@ program nour
 
   implicit none
 
+ !==============================================================
+      ! FILE NAME
+      ! READ MESH { call read_mesh(mesh_file_name)}
+      ! COMPUTE MESH PROPERTIES  {call compute_areas()   call compute_avgalt()}
+      ! MESH DIAGNOSTICS
+      ! FLOW TOPOLOGY  {call init_flow_topology() call print_graph_diagnostics()}
+      ! TIME-STEP INFORMATION
+      ! INITIALIZE HYDROLOGY   {call init_hydro()}
+      ! RUN HYDROLOGICAL MODEL {call compute_all()}
+      ! UPSTREAM FLOW DIAGNOSTICS
+      ! WRITE DETAILED WATER BALANCE CSV
+      ! WRITE STORAGE BALANCE CSV
+      ! WRITE ELEMENT BALANCE
+      ! WATER BALANCE DIAGNOSTICS
+      ! FINAL MESSAGE
+  !==============================================================
+
+
   integer(kind=ikind) :: i, t
   integer :: unit, ios
   character(len=256) :: mesh_file_name

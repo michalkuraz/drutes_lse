@@ -8,6 +8,17 @@ module routing
 
 contains
 
+!==============================================================
+      ! FLOW TOPOLOGY INITIALIZATION
+      ! BUILD GRAPH
+      ! FINALIZE ROUTING GRAPH
+      ! ROUTE SURFACE EXCESS WATER route_step(tstep)
+  !==============================================================
+
+
+
+
+
   !==============================================================
   ! FLOW TOPOLOGY INITIALIZATION
   !==============================================================

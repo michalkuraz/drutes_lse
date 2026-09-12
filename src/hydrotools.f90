@@ -9,6 +9,21 @@ module hydrotools
 contains
 
   !==============================================================
+     ! READ MESH
+     ! ALLOCATE MESH ARRAYS
+     ! read_meteodata
+     ! INITIALIZE HYDROLOGY (init_hydro)
+       !call read_meteodata_csv("meteo.csv")
+  !==============================================================
+
+
+
+
+
+
+
+
+  !==============================================================
   ! READ MESH
   !==============================================================
   subroutine read_mesh(filename)

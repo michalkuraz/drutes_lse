@@ -3,6 +3,29 @@ module hydrofnc
   use globals
   implicit none
 
+   ! ============================================================
+     ! Saturation vapor pressure [kPa]
+     ! Slope of saturation vapor pressure curve [kPa/degC]
+     ! Psychrometric constant [kPa/degC]
+     ! Convert measured wind speed to wind speed at 2 m [m/s]
+     ! Extraterrestrial radiation Ra [MJ m-2 day-1]
+     ! Net longwave radiation Rnl [MJ m-2 day-1]
+     ! Penman-Monteith reference evapotranspiration ETo [mm/day]
+     ! Effective soil saturation factor [-]
+     ! Unsaturated surface hydraulic conductivity [m/s]
+     ! Soil moisture reduction factor for infiltration [-]
+     ! Slope reduction factor for infiltration [-]
+     ! Slope-adjusted Curve Number [-]
+     ! P: Precipitation [mm/timestep]
+     ! E: Actual evapotranspiration [mm/timestep]
+     ! If: Infiltration [mm/timestep]
+     ! q1: Surface runoff [mm/timestep]
+     ! q2: Subsurface flow component (fast interflow) [mm/timestep]
+     ! q3: Subsurface drainage component(slow interflow) [mm/timestep]
+     ! pc: Percolation from subsurface to groundwater [mm/timestep]
+     ! bf: Baseflow from groundwater [mm/timestep]
+ ! ============================================================
+
   real(kind=rkind), parameter :: PI_RKIND = 4.0_rkind * atan(1.0_rkind)
 
 contains

@@ -196,137 +196,598 @@ contains
   end subroutine finalize_routing_graph
 
 
-  !==============================================================
-  ! ROUTE SURFACE EXCESS WATER
-  !==============================================================
-  subroutine route_step(tstep)
-    integer(kind=ikind), intent(in) :: tstep
+!==============================================================
+! ROUTE SURFACE EXCESS WATER route step (tstep)
+!
+! Routes surface runoff between elements according to
+! downstream slope/width weights.
+!
+! Results saved for every element and timestep:
+!   Qin_result
+!   Qout_result
+!   Overflow_result
+!   Storage_result
+!   deltas
+!
+! Catchment outlet:
+!   outlet_Q
+!   outlet_Q_m3s
+!==============================================================
+subroutine route_step(tstep)
 
-    integer(kind=ikind) :: el, i, side, dwn
-    real(kind=rkind) :: old_storage
-    real(kind=rkind) :: water_available
-    real(kind=rkind) :: losses
-    real(kind=rkind) :: available_after_losses
-    real(kind=rkind) :: storage_capacity
-    real(kind=rkind) :: routed_water
-    real(kind=rkind) :: weight_sum
-    real(kind=rkind) :: edge_weight
-    real(kind=rkind) :: routed_fraction
-    real(kind=rkind) :: catchment_area
-    real(kind=rkind) :: outlet_volume
+  implicit none
 
-    real(kind=rkind), allocatable :: runoff(:)
-    real(kind=rkind), allocatable :: new_storage(:)
-    real(kind=rkind), allocatable :: local_residual(:)
-    real(kind=rkind), allocatable :: routing_residual(:)
+  integer(kind=ikind), intent(in) :: tstep
 
-    allocate(runoff(elements%kolik))
-    allocate(new_storage(elements%kolik))
-    allocate(local_residual(elements%kolik))
-    allocate(routing_residual(elements%kolik))
+  integer(kind=ikind) :: el
+  integer(kind=ikind) :: i
+  integer(kind=ikind) :: side
+  integer(kind=ikind) :: dwn
 
-    runoff           = 0.0_rkind
-    new_storage      = storage
-    local_residual   = 0.0_rkind
-    routing_residual = 0.0_rkind
+  real(kind=rkind) :: old_storage
+  real(kind=rkind) :: water_available
+  real(kind=rkind) :: losses
+  real(kind=rkind) :: available_after_losses
 
-    elements%hydrobal(:)%inflow  = 0.0_rkind
-    elements%hydrobal(:)%outflow = 0.0_rkind
+  real(kind=rkind) :: storage_capacity
 
-    do el = 1, elements%kolik
-      old_storage = storage(el)
+  real(kind=rkind) :: routed_water
+  real(kind=rkind) :: routed_fraction
 
-      water_available = Pm(el,tstep) + old_storage
+  real(kind=rkind) :: weight_sum
+  real(kind=rkind) :: edge_weight
 
-      losses = elements%hydrobal(el)%ET + elements%hydrobal(el)%q1
-      losses = min(losses, water_available)
+  real(kind=rkind) :: catchment_area
+  real(kind=rkind) :: outlet_volume
 
-      storage_capacity = capacity(el) / &
-           (1.0_rkind + storage_slope_coeff * max(elements%slope(el), 0.0_rkind))
+  real(kind=rkind), allocatable :: runoff(:)
+  real(kind=rkind), allocatable :: new_storage(:)
+  real(kind=rkind), allocatable :: local_residual(:)
+  real(kind=rkind), allocatable :: routing_residual(:)
 
-      storage_capacity = max(storage_capacity, 0.0_rkind)
 
-      available_after_losses = water_available - losses
+  !============================================================
+  ! SAFETY CHECKS
+  !============================================================
 
-      new_storage(el) = min(available_after_losses, storage_capacity)
-      runoff(el)      = max(available_after_losses - new_storage(el), 0.0_rkind)
+  if (tstep < 1_ikind .or. tstep > n_steps) then
 
-      local_residual(el) = water_available - losses - new_storage(el) - runoff(el)
-    end do
+    write(*,*) 'ERROR in route_step'
+    write(*,*) 'Invalid timestep = ', tstep
+    write(*,*) 'n_steps          = ', n_steps
 
-    outlet_Q(tstep) = 0.0_rkind
+    error stop
 
-    do i = 1, elements%kolik
-      el = flow_order(i)
+  end if
 
-      routed_water = elements%hydrobal(el)%inflow + runoff(el)
-      elements%hydrobal(el)%outflow = routed_water
 
-      if (routed_water > 0.0_rkind) then
-        weight_sum = 0.0_rkind
+  if (elements%kolik <= 0_ikind) then
 
-        do side = 1, 3
-          dwn = elements%downstream(el)%els(side)
+    write(*,*) 'ERROR in route_step'
+    write(*,*) 'No mesh elements are available.'
 
-          if (dwn > 0_ikind) then
-            edge_weight = max(elements%downstream(el)%slopes(side), 0.0_rkind) * &
-                          max(elements%downstream(el)%widths(side), min_edge_width)
+    error stop
 
-            weight_sum = weight_sum + edge_weight
-          end if
-        end do
+  end if
 
-        if (weight_sum > 0.0_rkind) then
-          do side = 1, 3
-            dwn = elements%downstream(el)%els(side)
 
-            if (dwn > 0_ikind) then
-              edge_weight = max(elements%downstream(el)%slopes(side), 0.0_rkind) * &
-                            max(elements%downstream(el)%widths(side), min_edge_width)
+  if (.not. allocated(storage)) then
+    error stop 'ERROR route_step: storage not allocated.'
+  end if
 
-              routed_fraction = edge_weight / weight_sum
+  if (.not. allocated(capacity)) then
+    error stop 'ERROR route_step: capacity not allocated.'
+  end if
 
-              elements%hydrobal(dwn)%inflow = elements%hydrobal(dwn)%inflow + &
-                                               routed_water * routed_fraction
-            end if
-          end do
-        else
-          outlet_Q(tstep) = outlet_Q(tstep) + routed_water
-        end if
-      end if
-    end do
+  if (.not. allocated(flow_order)) then
+    error stop 'ERROR route_step: flow_order not allocated.'
+  end if
 
-    do el = 1, elements%kolik
-      storage(el) = new_storage(el)
+  if (.not. allocated(Qin_result)) then
+    error stop 'ERROR route_step: Qin_result not allocated.'
+  end if
 
-      elements%overflow(el) = runoff(el)
+  if (.not. allocated(Qout_result)) then
+    error stop 'ERROR route_step: Qout_result not allocated.'
+  end if
 
-      routing_residual(el) = elements%hydrobal(el)%inflow + runoff(el) - &
-                             elements%hydrobal(el)%outflow
+  if (.not. allocated(Overflow_result)) then
+    error stop 'ERROR route_step: Overflow_result not allocated.'
+  end if
 
-      elements%hydrobal(el)%deltas = local_residual(el) + routing_residual(el)
+  if (.not. allocated(Storage_result)) then
+    error stop 'ERROR route_step: Storage_result not allocated.'
+  end if
 
-      deltas(el,tstep)          = elements%hydrobal(el)%deltas
-      Qin_result(el,tstep)      = elements%hydrobal(el)%inflow
-      Qout_result(el,tstep)     = elements%hydrobal(el)%outflow
-      Overflow_result(el,tstep) = elements%overflow(el)
-      Storage_result(el,tstep)  = storage(el)
-    end do
+  if (.not. allocated(deltas)) then
+    error stop 'ERROR route_step: deltas not allocated.'
+  end if
 
-    catchment_area = sum(elements%area)
-    outlet_volume  = outlet_Q(tstep) / 1000.0_rkind * catchment_area
+  if (.not. allocated(outlet_Q)) then
+    error stop 'ERROR route_step: outlet_Q not allocated.'
+  end if
 
-    if (dt_days > 0.0_rkind) then
-      outlet_Q_m3s(tstep) = outlet_volume / (dt_days * 86400.0_rkind)
-    else
-      outlet_Q_m3s(tstep) = 0.0_rkind
+  if (.not. allocated(outlet_Q_m3s)) then
+    error stop 'ERROR route_step: outlet_Q_m3s not allocated.'
+  end if
+
+
+  !============================================================
+  ! ALLOCATE TEMPORARY ROUTING ARRAYS
+  !============================================================
+
+  allocate(runoff(elements%kolik))
+
+  allocate(new_storage(elements%kolik))
+
+  allocate(local_residual(elements%kolik))
+
+  allocate(routing_residual(elements%kolik))
+
+
+  runoff = 0.0_rkind
+
+  new_storage = storage
+
+  local_residual = 0.0_rkind
+
+  routing_residual = 0.0_rkind
+
+
+  !============================================================
+  ! RESET ROUTING FLUXES FOR CURRENT TIMESTEP
+  !============================================================
+
+  elements%hydrobal(:)%inflow = 0.0_rkind
+
+  elements%hydrobal(:)%outflow = 0.0_rkind
+
+  elements%overflow(:) = 0.0_rkind
+
+
+  !============================================================
+  ! PART 1
+  !
+  ! CALCULATE LOCAL SURFACE STORAGE AND EXCESS RUNOFF
+  !============================================================
+
+  do el = 1, elements%kolik
+
+
+    !----------------------------------------------------------
+    ! Previous routing storage
+    !----------------------------------------------------------
+
+    old_storage = &
+         max(storage(el), 0.0_rkind)
+
+
+    !----------------------------------------------------------
+    ! Surface water entering local routing storage
+    !
+    ! Current formulation:
+    ! precipitation + previous routing storage
+    !----------------------------------------------------------
+
+    water_available = &
+         max(Pm(el,tstep), 0.0_rkind) + &
+         old_storage
+
+
+    !----------------------------------------------------------
+    ! Surface losses
+    !
+    ! ET and q1 are taken from the hydrological calculation.
+    ! Do not allow losses to exceed available surface water.
+    !----------------------------------------------------------
+
+    losses = &
+         max(elements%hydrobal(el)%ET, 0.0_rkind) + &
+         max(elements%hydrobal(el)%q1, 0.0_rkind)
+
+
+    losses = &
+         min(losses, water_available)
+
+
+    !----------------------------------------------------------
+    ! Remaining water
+    !----------------------------------------------------------
+
+    available_after_losses = &
+         max(water_available - losses, 0.0_rkind)
+
+
+    !----------------------------------------------------------
+    ! Slope-adjusted surface storage capacity
+    !----------------------------------------------------------
+
+    storage_capacity = &
+         capacity(el) / &
+         (1.0_rkind + &
+          storage_slope_coeff * &
+          max(elements%slope(el), 0.0_rkind))
+
+
+    storage_capacity = &
+         max(storage_capacity, 0.0_rkind)
+
+
+    !----------------------------------------------------------
+    ! Water retained locally
+    !----------------------------------------------------------
+
+    new_storage(el) = &
+         min(available_after_losses, &
+             storage_capacity)
+
+
+    !----------------------------------------------------------
+    ! Excess water available for routing
+    !----------------------------------------------------------
+
+    runoff(el) = &
+         max(available_after_losses - &
+             new_storage(el), &
+             0.0_rkind)
+
+
+    !----------------------------------------------------------
+    ! Local numerical balance check
+    !
+    ! Should be approximately zero:
+    !
+    ! water_available
+    ! - losses
+    ! - storage
+    ! - runoff
+    !----------------------------------------------------------
+
+    local_residual(el) = &
+         water_available - &
+         losses - &
+         new_storage(el) - &
+         runoff(el)
+
+
+  end do
+
+
+  !============================================================
+  ! PART 2
+  !
+  ! ROUTE EXCESS WATER THROUGH THE ELEMENT NETWORK
+  !============================================================
+
+  outlet_Q(tstep) = 0.0_rkind
+
+
+  do i = 1, elements%kolik
+
+
+    !----------------------------------------------------------
+    ! Process elements according to routing order
+    !----------------------------------------------------------
+
+    el = flow_order(i)
+
+
+    !----------------------------------------------------------
+    ! Defensive check
+    !----------------------------------------------------------
+
+    if (el < 1_ikind .or. &
+        el > elements%kolik) then
+
+      write(*,*) 'ERROR in route_step'
+      write(*,*) 'Invalid flow_order value.'
+      write(*,*) 'Position   = ', i
+      write(*,*) 'Element    = ', el
+      write(*,*) 'N elements = ', elements%kolik
+
+      error stop
+
     end if
 
-    deallocate(runoff)
-    deallocate(new_storage)
-    deallocate(local_residual)
-    deallocate(routing_residual)
 
-  end subroutine route_step
+    !----------------------------------------------------------
+    ! Total water routed from this element:
+    !
+    ! upstream inflow + local excess runoff
+    !----------------------------------------------------------
+
+    routed_water = &
+         max(elements%hydrobal(el)%inflow, &
+             0.0_rkind) + &
+         max(runoff(el), 0.0_rkind)
+
+
+    elements%hydrobal(el)%outflow = &
+         routed_water
+
+
+    if (routed_water > 0.0_rkind) then
+
+
+      !========================================================
+      ! Determine total downstream routing weight
+      !========================================================
+
+      weight_sum = 0.0_rkind
+
+
+      do side = 1, 3
+
+
+        dwn = &
+             elements%downstream(el)%els(side)
+
+
+        if (dwn > 0_ikind) then
+
+
+          !----------------------------------------------------
+          ! Check downstream element number
+          !----------------------------------------------------
+
+          if (dwn > elements%kolik) then
+
+            write(*,*) 'ERROR in route_step'
+            write(*,*) 'Invalid downstream element.'
+            write(*,*) 'Current element    = ', el
+            write(*,*) 'Side               = ', side
+            write(*,*) 'Downstream element = ', dwn
+
+            error stop
+
+          end if
+
+
+          !----------------------------------------------------
+          ! Routing weight:
+          !
+          ! slope * effective edge width
+          !----------------------------------------------------
+
+          edge_weight = &
+               max(elements%downstream(el)%slopes(side), &
+                   0.0_rkind) * &
+               max(elements%downstream(el)%widths(side), &
+                   min_edge_width)
+
+
+          weight_sum = &
+               weight_sum + edge_weight
+
+
+        end if
+
+
+      end do
+
+
+      !========================================================
+      ! ROUTE TO DOWNSTREAM ELEMENTS
+      !========================================================
+
+      if (weight_sum > 0.0_rkind) then
+
+
+        do side = 1, 3
+
+
+          dwn = &
+               elements%downstream(el)%els(side)
+
+
+          if (dwn > 0_ikind) then
+
+
+            edge_weight = &
+                 max(elements%downstream(el)%slopes(side), &
+                     0.0_rkind) * &
+                 max(elements%downstream(el)%widths(side), &
+                     min_edge_width)
+
+
+            routed_fraction = &
+                 edge_weight / weight_sum
+
+
+            elements%hydrobal(dwn)%inflow = &
+                 elements%hydrobal(dwn)%inflow + &
+                 routed_water * routed_fraction
+
+
+          end if
+
+
+        end do
+
+
+      else
+
+
+        !======================================================
+        ! NO VALID DOWNSTREAM ROUTE
+        !
+        ! Water leaves the modeled catchment.
+        !======================================================
+
+        outlet_Q(tstep) = &
+             outlet_Q(tstep) + &
+             routed_water
+
+
+      end if
+
+
+    end if
+
+
+  end do
+
+
+  !============================================================
+  ! PART 3
+  !
+  ! SAVE ROUTING STATE AND RESULTS
+  !============================================================
+
+  do el = 1, elements%kolik
+
+
+    !----------------------------------------------------------
+    ! Update persistent routing storage
+    !----------------------------------------------------------
+
+    storage(el) = &
+         max(new_storage(el), 0.0_rkind)
+
+
+    !----------------------------------------------------------
+    ! Local overflow / excess runoff
+    !----------------------------------------------------------
+
+    elements%overflow(el) = &
+         max(runoff(el), 0.0_rkind)
+
+
+    !----------------------------------------------------------
+    ! Routing conservation check
+    !
+    ! Qin + local runoff - Qout
+    !
+    ! Should be approximately zero.
+    !----------------------------------------------------------
+
+    routing_residual(el) = &
+         elements%hydrobal(el)%inflow + &
+         runoff(el) - &
+         elements%hydrobal(el)%outflow
+
+
+    !----------------------------------------------------------
+    ! Combined numerical residual
+    !----------------------------------------------------------
+
+    elements%hydrobal(el)%deltas = &
+         local_residual(el) + &
+         routing_residual(el)
+
+
+    !----------------------------------------------------------
+    ! Save routing results for output after compute_all()
+    !----------------------------------------------------------
+
+    deltas(el,tstep) = &
+         elements%hydrobal(el)%deltas
+
+
+    Qin_result(el,tstep) = &
+         elements%hydrobal(el)%inflow
+
+
+    Qout_result(el,tstep) = &
+         elements%hydrobal(el)%outflow
+
+
+    Overflow_result(el,tstep) = &
+         elements%overflow(el)
+
+
+    Storage_result(el,tstep) = &
+         storage(el)
+
+
+  end do
+
+
+  !============================================================
+  ! PART 4
+  !
+  ! CONVERT CATCHMENT OUTLET DEPTH TO DISCHARGE
+  !============================================================
+
+  catchment_area = &
+       sum(elements%area)
+
+
+  if (catchment_area < 0.0_rkind) then
+
+    write(*,*) 'ERROR in route_step'
+    write(*,*) 'Negative catchment area.'
+
+    error stop
+
+  end if
+
+
+  ! outlet_Q is expressed as an equivalent water depth [mm].
+  !
+  ! mm -> m:
+  !     outlet_Q / 1000
+  !
+  ! volume:
+  !     depth [m] * catchment area [m2]
+  !
+  outlet_volume = &
+       outlet_Q(tstep) / &
+       1000.0_rkind * &
+       catchment_area
+
+
+  !------------------------------------------------------------
+  ! Convert volume per timestep to m3/s
+  !------------------------------------------------------------
+
+  if (dt_seconds > 0.0_rkind) then
+
+    outlet_Q_m3s(tstep) = &
+         outlet_volume / dt_seconds
+
+  else
+
+    outlet_Q_m3s(tstep) = &
+         0.0_rkind
+
+  end if
+
+
+  !============================================================
+  ! OPTIONAL WATER-BALANCE WARNING
+  !============================================================
+
+  do el = 1, elements%kolik
+
+    if (abs(deltas(el,tstep)) > &
+        1.0e-8_rkind) then
+
+      write(*,*) &
+           'WARNING routing residual:', &
+           ' dt=', dt_hours, &
+           ' step=', tstep, &
+           ' el=', el, &
+           ' residual=', deltas(el,tstep)
+
+    end if
+
+  end do
+
+
+  !============================================================
+  ! CLEAN UP TEMPORARY ARRAYS
+  !============================================================
+
+  deallocate(runoff)
+
+  deallocate(new_storage)
+
+  deallocate(local_residual)
+
+  deallocate(routing_residual)
+
+
+end subroutine route_step
 
 end module routing
